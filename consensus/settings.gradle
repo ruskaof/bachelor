@@ -1,0 +1,5 @@
+rootProject.name = 'consensus'
+include 'kv-store-ratis'
+include 'kv-store-ratis-api'
+include 'kv-store-client'
+
