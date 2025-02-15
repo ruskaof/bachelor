@@ -4,6 +4,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.metrics.MetricRegistries;
 import org.apache.ratis.metrics.impl.JvmMetrics;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -79,6 +80,10 @@ public class KvStoreApplication {
                 .toList();
         String groupId = System.getenv("RATIS_KV_GROUP_ID");
         String storagePath = System.getenv("RATIS_KV_STORAGE_PATH");
+
+        final MetricRegistries registries = MetricRegistries.global();
+        JvmMetrics.addJvmMetrics(registries);
+        registries.enableJmxReporter();
 
         run(peerId, port, peers, groupId, storagePath);
     }
