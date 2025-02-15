@@ -1,8 +1,6 @@
 package ru.itmo.rusinov.consensus.kv.store.ratis;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
-import com.beust.jcommander.Parameters;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.protocol.RaftGroup;
@@ -19,26 +17,14 @@ import ru.itmo.rusinov.consensus.kv.store.ratis.server.MapDbKvDatabase;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Parameters(commandDescription = "Start an filestore server")
+@Slf4j
 public class KvStoreApplication {
-
-    @Parameter(names = {"--id", "-i"}, required = true)
-    private String id;
-
-    @Parameter(names = {"--peers", "-r"}, description = "id:host:port", required = true)
-    private List<String> peers;
-
-    @Parameter(names = {"--port", "-p"}, required = true)
-    private int port;
-
-    @Parameter(names = {"-g"})
-    private String raftGroupId = "kvStoreRaftGroup";
-
-    private void run() throws IOException, InterruptedException {
+    private static void run(String id, int port, List<RaftPeer> peers, String groupId) throws IOException, InterruptedException {
         RaftPeerId peerId = RaftPeerId.valueOf(id);
         RaftProperties properties = new RaftProperties();
 
@@ -47,7 +33,7 @@ public class KvStoreApplication {
         RaftServerConfigKeys.setStorageDir(properties, Collections.singletonList(Files.createTempDirectory("kvStorage").toFile()));
         StateMachine stateMachine = new KvStateMachine(new MapDbKvDatabase());
 
-        final RaftGroup raftGroup = RaftGroup.valueOf(RaftGroupId.valueOf(ByteString.copyFromUtf8(raftGroupId)), parsePeers());
+        final RaftGroup raftGroup = RaftGroup.valueOf(RaftGroupId.valueOf(ByteString.copyFromUtf8(groupId)), peers);
         RaftServer raftServer = RaftServer.newBuilder()
                 .setServerId(peerId)
                 .setStateMachine(stateMachine)
@@ -55,25 +41,27 @@ public class KvStoreApplication {
                 .build();
         raftServer.start();
 
-//        // todo remove client from here
-//        KvStoreRatisClient client = new KvStoreRatisClient(raftGroup, properties);
-//        client.test();
-
-        for (; raftServer.getLifeCycleState() != LifeCycle.State.CLOSED; ) {
+        while (raftServer.getLifeCycleState() != LifeCycle.State.CLOSED) {
             TimeUnit.SECONDS.sleep(1);
         }
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        KvStoreApplication main = new KvStoreApplication();
-        JCommander.newBuilder().addObject(main).build().parse(args);
-        main.run();
-    }
+        log.info("Starting raft kv store peer with peerId={}, port={}, peers={}", System.getenv("RATIS_KV_PEER_ID"), System.getenv("RATIS_KV_PORT"), System.getenv("RATIS_KV_PEERS"));
 
-    private RaftPeer[] parsePeers() {
-        return peers.stream().map((p) -> {
-            var addressParts = p.split(":");
-            return RaftPeer.newBuilder().setId(addressParts[0]).setAddress(addressParts[1] + ":" + addressParts[2]).build();
-        }).toArray(RaftPeer[]::new);
+        String peerId = System.getenv("RATIS_KV_PEER_ID");
+        int port = Integer.parseInt(System.getenv("RATIS_KV_PORT"));
+        var peers = Arrays.stream(System.getenv("RATIS_KV_PEERS").split(","))
+                .map((p) -> {
+                    var addressParts = p.split(":");
+                    return RaftPeer.newBuilder()
+                            .setId(addressParts[0])
+                            .setAddress(addressParts[1] + ":" + addressParts[2])
+                            .build();
+                })
+                .toList();
+        String groupId = System.getenv("RATIS_KV_GROUP_ID");
+
+        run(peerId, port, peers, groupId);
     }
 }

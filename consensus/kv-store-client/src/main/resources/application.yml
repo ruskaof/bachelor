@@ -3,3 +3,7 @@ raft:
   peers:
     - id: 1
       address: localhost:8081
+    - id: 2
+      address: localhost:8082
+    - id: 3
+      address: localhost:8083

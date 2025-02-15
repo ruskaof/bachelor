@@ -1,0 +1,36 @@
+services:
+  kv-peer-1:
+    build: .
+    ports:
+      - "8081:8081"
+    networks:
+      - backend
+    environment:
+      RATIS_KV_PEER_ID: 1
+      RATIS_KV_PORT: 8081
+      RATIS_KV_PEERS: 1:localhost:8081,2:kv-peer-2:8082,3:kv-peer-3:8083
+      RATIS_KV_GROUP_ID: kvStoreRaftGroup
+  kv-peer-2:
+    build: .
+    ports:
+      - "8082:8082"
+    networks:
+      - backend
+    environment:
+      RATIS_KV_PEER_ID: 2
+      RATIS_KV_PORT: 8082
+      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:localhost:8082,3:kv-peer-3:8083
+      RATIS_KV_GROUP_ID: kvStoreRaftGroup
+  kv-peer-3:
+    build: .
+    ports:
+      - "8083:8083"
+    networks:
+      - backend
+    environment:
+      RATIS_KV_PEER_ID: 3
+      RATIS_KV_PORT: 8083
+      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:localhost:8083
+      RATIS_KV_GROUP_ID: kvStoreRaftGroup
+networks:
+  backend:
