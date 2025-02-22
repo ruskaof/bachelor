@@ -2,4 +2,5 @@ rootProject.name = 'consensus'
 include 'kv-store-ratis'
 include 'kv-store-ratis-api'
 include 'kv-store-client'
-
+include 'paxos-core'
+include 'kv-store-paxos'
