@@ -70,7 +70,7 @@ public class Replica {
     }
 
     public void run() {
-        log.info("Starting leader");
+        log.info("Starting replica {}", id);
         while (true) {
             var msg = environment.getNextMessage();
             log.info("Handling message: {}", msg);

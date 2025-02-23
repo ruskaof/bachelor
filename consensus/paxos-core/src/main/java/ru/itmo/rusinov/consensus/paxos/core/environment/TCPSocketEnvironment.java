@@ -22,6 +22,12 @@ public class TCPSocketEnvironment implements Environment {
         startServer();
     }
 
+    public TCPSocketEnvironment(int serverPort, Map<UUID, InetSocketAddress> destinationMap) {
+        this.serverPort = serverPort;
+        this.destinationMap.putAll(destinationMap);
+        startServer();
+    }
+
     public void addDestination(UUID uuid, String host, int port) {
         destinationMap.put(uuid, new InetSocketAddress(host, port));
     }

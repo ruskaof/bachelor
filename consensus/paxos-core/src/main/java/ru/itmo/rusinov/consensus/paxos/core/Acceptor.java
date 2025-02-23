@@ -26,7 +26,7 @@ public class Acceptor {
     }
 
     public void run() {
-        log.info("Starting acceptor");
+        log.info("Starting acceptor {}", id);
         while (true) {
             var msg = environment.getNextMessage();
             log.info("Handling message: {}", msg);

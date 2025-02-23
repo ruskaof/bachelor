@@ -27,6 +27,7 @@ public class Leader {
     }
 
     public void run() {
+        log.info("Starting leader {}", id);
         launchScout();
         while (true) {
             handleMessage(this.environment.getNextMessage());
