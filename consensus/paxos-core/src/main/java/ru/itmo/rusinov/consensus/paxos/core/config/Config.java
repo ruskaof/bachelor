@@ -4,8 +4,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public record Config(
-        Set<UUID> leaders,
-        Set<UUID> replicas,
-        Set<UUID> acceptors
+        Set<UUID> replicas
 ) {
 }

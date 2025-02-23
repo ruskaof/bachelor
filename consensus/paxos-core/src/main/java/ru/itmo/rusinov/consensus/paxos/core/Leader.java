@@ -30,7 +30,7 @@ public class Leader {
         log.info("Starting leader {}", id);
         launchScout();
         while (true) {
-            handleMessage(this.environment.getNextMessage());
+            handleMessage(this.environment.getNextLeaderMessage());
         }
     }
 
@@ -77,20 +77,20 @@ public class Leader {
     private void launchScout() {
         var waitFor = new HashSet<UUID>();
 
-        for (UUID a : this.config.acceptors()) {
+        for (UUID a : this.config.replicas()) {
             this.environment.sendMessage(a, new P1aMessage(this.id, this.ballotNumber));
             waitFor.add(a);
         }
 
         var pvalues = new HashSet<Pvalue>();
         while (true) {
-            var msg = this.environment.getNextMessage();
+            var msg = this.environment.getNextLeaderMessage();
 
             if (msg instanceof P1bMessage p1b) {
                 if (this.ballotNumber.equals(p1b.ballotNumber()) && waitFor.contains(p1b.src())) {
                     pvalues.addAll(p1b.accepted());
                     waitFor.remove(p1b.src());
-                    if (waitFor.size() < (this.config.acceptors().size() + 1) / 2) {
+                    if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
                         this.handleMessage(new AdoptedMessage(this.id, this.ballotNumber, pvalues));
                         break;
                     }
@@ -105,17 +105,17 @@ public class Leader {
     private void launchCommander(BallotNumber ballotNumber, Long slotNumber, Command command) {
         var waitFor = new HashSet<UUID>();
 
-        for (UUID a : this.config.acceptors()) {
+        for (UUID a : this.config.replicas()) {
             this.environment.sendMessage(a, new P2aMessage(this.id, ballotNumber, slotNumber, command));
             waitFor.add(a);
         }
 
         while (true) {
-            var msg = environment.getNextMessage();
+            var msg = environment.getNextLeaderMessage();
             if (msg instanceof P2bMessage p2b) {
                 if (ballotNumber.equals(p2b.ballotNumber()) && waitFor.contains(p2b.src())) {
                     waitFor.remove(p2b.src());
-                    if (waitFor.size() < (this.config.acceptors().size() + 1) / 2) {
+                    if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
                         for (UUID r : this.config.replicas()) {
                             this.environment.sendMessage(r, new DecisionMessage(this.id, slotNumber, command));
                         }

@@ -2,7 +2,8 @@ package ru.itmo.rusinov.consensus.paxos.core.environment;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import ru.itmo.rusinov.consensus.paxos.core.message.PaxosMessage;
+import ru.itmo.rusinov.consensus.paxos.core.environment.tcp.SocketManager;
+import ru.itmo.rusinov.consensus.paxos.core.message.*;
 
 import java.io.*;
 import java.net.*;
@@ -13,7 +14,11 @@ import java.util.concurrent.*;
 public class TCPSocketEnvironment implements Environment {
     private final Map<UUID, InetSocketAddress> destinationMap = new ConcurrentHashMap<>();
     private final Map<UUID, SocketManager> socketManagers = new ConcurrentHashMap<>();
-    private final BlockingQueue<PaxosMessage> messageQueue = new LinkedBlockingQueue<>();
+
+    private final BlockingQueue<PaxosMessage> acceptorQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<PaxosMessage> replicaQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<PaxosMessage> leaderQueue = new LinkedBlockingQueue<>();
+
     private final int serverPort;
     private ServerSocket serverSocket;
 
@@ -46,10 +51,20 @@ public class TCPSocketEnvironment implements Environment {
 
     @SneakyThrows
     @Override
-    public PaxosMessage getNextMessage() {
-        var result = messageQueue.take();
-        log.debug("Env getting: {}", result);
-        return result;
+    public PaxosMessage getNextAcceptorMessage() {
+        return acceptorQueue.take();
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosMessage getNextLeaderMessage() {
+        return leaderQueue.take();
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosMessage getNextReplicaMessage() {
+        return replicaQueue.take();
     }
 
     private void startServer() {
@@ -60,12 +75,12 @@ public class TCPSocketEnvironment implements Environment {
 
                 while (true) {
                     Socket clientSocket = serverSocket.accept();
-                    new Thread(new MessageHandler(clientSocket)).start();
+                    new Thread(new MessageHandler(clientSocket), "TcpClientHandler").start();
                 }
             } catch (IOException e) {
                 log.error("Server error: {}", e.getMessage());
             }
-        }).start();
+        }, "TcpSocketEnvironment").start();
     }
 
     private class MessageHandler implements Runnable {
@@ -82,7 +97,7 @@ public class TCPSocketEnvironment implements Environment {
                 while (true) {
                     try {
                         PaxosMessage message = (PaxosMessage) in.readObject();
-                        messageQueue.put(message);
+                        putMessageToQueues(message);
                     } catch (EOFException e) {
                         log.info("Client disconnected: {}", socket.getRemoteSocketAddress());
                         break;
@@ -90,7 +105,7 @@ public class TCPSocketEnvironment implements Environment {
                         log.error("Invalid message format");
                     }
                 }
-            } catch (IOException | InterruptedException e) {
+            } catch (IOException e) {
                 log.error("Connection error: {}", e.getMessage());
             } finally {
                 socket.close();
@@ -98,51 +113,21 @@ public class TCPSocketEnvironment implements Environment {
         }
     }
 
-    private static class SocketManager {
-        private final InetSocketAddress address;
-        private volatile Socket socket;
-        private volatile ObjectOutputStream out;
+    @SneakyThrows
+    private void putMessageToQueues(PaxosMessage paxosMessage) {
+        switch (paxosMessage) {
 
-        public SocketManager(InetSocketAddress address) {
-            this.address = address;
-            connect();
-        }
+            case RequestMessage rm -> replicaQueue.put(rm);
+            case DecisionMessage dm -> replicaQueue.put(dm);
 
-        @SneakyThrows
-        private synchronized void connect() {
-            close();
-            for (int attempt = 1; ; attempt++) {
-                try {
-                    socket = new Socket(address.getHostName(), address.getPort());
-                    out = new ObjectOutputStream(socket.getOutputStream());
-                    log.info("Connected to {}", address);
-                    return;
-                } catch (IOException e) {
-                    log.error("Connection attempt {} to {} failed: {}", attempt, address, e.getMessage());
-                    Thread.sleep(1000);
-                }
-            }
-        }
+            case ProposeMessage pm -> leaderQueue.put(pm);
+            case P1bMessage p1b -> leaderQueue.put(p1b);
+            case P2bMessage p2b -> leaderQueue.put(p2b);
 
-        public synchronized void sendMessage(PaxosMessage paxosMessage) {
-            if (socket == null || socket.isClosed()) {
-                connect();
-            }
-            if (socket != null && out != null) {
-                try {
-                    out.writeObject(paxosMessage);
-                    out.flush();
-                } catch (IOException e) {
-                    log.error("Error sending message:", e);
-                    connect();
-                }
-            }
-        }
+            case P1aMessage p1a -> acceptorQueue.put(p1a);
+            case P2aMessage p2a -> acceptorQueue.put(p2a);
 
-        @SneakyThrows
-        private synchronized void close() {
-            if (out != null) out.close();
-            if (socket != null) socket.close();
+            default -> throw new IllegalStateException("Unexpected value: " + paxosMessage);
         }
     }
 }

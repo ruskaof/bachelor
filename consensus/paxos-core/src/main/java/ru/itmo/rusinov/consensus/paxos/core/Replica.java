@@ -46,7 +46,7 @@ public class Replica {
             if (!decisions.containsKey(this.slotIn)) {
                 var cmd = this.requests.poll();
                 this.proposals.put(this.slotIn, cmd);
-                for (UUID l : config.leaders()) {
+                for (UUID l : config.replicas()) {
                     this.environment.sendMessage(l, new ProposeMessage(this.id, this.slotIn, cmd));
                 }
             }
@@ -72,7 +72,7 @@ public class Replica {
     public void run() {
         log.info("Starting replica {}", id);
         while (true) {
-            var msg = environment.getNextMessage();
+            var msg = environment.getNextReplicaMessage();
             log.info("Handling message: {}", msg);
             if (msg instanceof RequestMessage rm) {
                 this.requests.add(rm.command());

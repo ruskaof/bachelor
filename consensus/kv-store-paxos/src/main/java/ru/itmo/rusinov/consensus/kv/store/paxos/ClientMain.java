@@ -12,7 +12,7 @@ public class ClientMain {
 
         var environment = new TCPSocketEnvironment(8080);
 
-        environment.addDestination(replicaUuid, "localhost", 7913);
+        environment.addDestination(replicaUuid, "localhost", 7910);
 
         environment.sendMessage(replicaUuid, new RequestMessage(new UUID(1, 0), new TestCommand("test'test")));
     }

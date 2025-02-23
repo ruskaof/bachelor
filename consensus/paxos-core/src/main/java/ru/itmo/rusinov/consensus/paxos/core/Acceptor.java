@@ -28,7 +28,7 @@ public class Acceptor {
     public void run() {
         log.info("Starting acceptor {}", id);
         while (true) {
-            var msg = environment.getNextMessage();
+            var msg = environment.getNextAcceptorMessage();
             log.info("Handling message: {}", msg);
             switch (msg) {
                 case P1aMessage p1a -> {

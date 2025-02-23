@@ -7,5 +7,7 @@ import java.util.UUID;
 public interface Environment {
 
     void sendMessage(UUID destination, PaxosMessage paxosMessage);
-    PaxosMessage getNextMessage();
+    PaxosMessage getNextAcceptorMessage();
+    PaxosMessage getNextLeaderMessage();
+    PaxosMessage getNextReplicaMessage();
 }
