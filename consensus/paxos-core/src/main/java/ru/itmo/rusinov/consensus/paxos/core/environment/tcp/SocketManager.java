@@ -14,7 +14,6 @@ import java.net.Socket;
 public class SocketManager {
     private final InetSocketAddress address;
     private volatile Socket socket;
-    private volatile CodedOutputStream out;
 
     public SocketManager(InetSocketAddress address) {
         this.address = address;
@@ -27,7 +26,6 @@ public class SocketManager {
         for (int attempt = 1; ; attempt++) {
             try {
                 socket = new Socket(address.getHostName(), address.getPort());
-                out = CodedOutputStream.newInstance(socket.getOutputStream());
                 log.info("Connected to {}", address);
                 return;
             } catch (IOException e) {
@@ -41,10 +39,9 @@ public class SocketManager {
         if (socket == null || socket.isClosed()) {
             connect();
         }
-        if (socket != null && out != null) {
+        if (socket != null) {
             try {
-                out.writeMessageNoTag(paxosMessage);
-                out.flush();
+                paxosMessage.writeDelimitedTo(socket.getOutputStream());
             } catch (IOException e) {
                 log.error("Error sending message:", e);
                 connect();

@@ -5,10 +5,10 @@ import ru.itmo.rusinov.consensus.paxos.core.PaxosServer;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.TCPSocketEnvironment;
 
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 public class ThreeReplicas {
     @SneakyThrows
@@ -23,9 +23,9 @@ public class ThreeReplicas {
                 "0", "1", "2"
         ));
 
-        var server1 = new PaxosServer("0", new LoggingNopStateMachine(), new TCPSocketEnvironment(7910, destinations), config);
-        var server2 = new PaxosServer("1", new LoggingNopStateMachine(), new TCPSocketEnvironment(7911, destinations), config);
-        var server3 = new PaxosServer("2", new LoggingNopStateMachine(), new TCPSocketEnvironment(7912, destinations), config);
+        var server1 = new PaxosServer("0", new LoggingNopStateMachine(), new TCPSocketEnvironment(7910, destinations), config, new File("/tmp"));
+        var server2 = new PaxosServer("1", new LoggingNopStateMachine(), new TCPSocketEnvironment(7911, destinations), config, new File("/tmp"));
+        var server3 = new PaxosServer("2", new LoggingNopStateMachine(), new TCPSocketEnvironment(7912, destinations), config, new File("/tmp"));
 
         server1.start();
         server2.start();

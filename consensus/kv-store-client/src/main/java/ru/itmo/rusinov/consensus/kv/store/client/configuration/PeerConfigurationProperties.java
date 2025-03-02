@@ -4,13 +4,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 
-@ConfigurationProperties("raft")
-public record RaftConfigurationProperties(
+@ConfigurationProperties("servers")
+public record PeerConfigurationProperties(
         String groupId,
-        List<RaftPeerConfiguration> peers
+        List<PeerConfiguration> peers
 ) {
 
-    public record RaftPeerConfiguration(
+    public record PeerConfiguration(
             String id,
             String address
     ) {

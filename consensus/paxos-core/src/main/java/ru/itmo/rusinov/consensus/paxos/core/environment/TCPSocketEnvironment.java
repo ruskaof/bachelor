@@ -1,5 +1,6 @@
 package ru.itmo.rusinov.consensus.paxos.core.environment;
 
+import com.google.protobuf.CodedInputStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos.PaxosMessage;
@@ -115,7 +116,7 @@ public class TCPSocketEnvironment implements Environment {
             try {
                 while (true) {
                     try {
-                        PaxosMessage message = PaxosMessage.parseFrom(socket.getInputStream());
+                        PaxosMessage message = PaxosMessage.parseDelimitedFrom(socket.getInputStream());
                         putMessageToQueues(message);
                     } catch (EOFException e) {
                         log.info("Client disconnected: {}", socket.getRemoteSocketAddress());
@@ -123,7 +124,7 @@ public class TCPSocketEnvironment implements Environment {
                     }
                 }
             } catch (IOException e) {
-                log.error("Connection error: {}", e.getMessage());
+                log.error("Connection error: {}", e);
             } finally {
                 socket.close();
             }
