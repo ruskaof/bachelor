@@ -1,12 +1,10 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
 import lombok.extern.slf4j.Slf4j;
+import paxos.Paxos;
+import paxos.Paxos.*;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
-import ru.itmo.rusinov.consensus.paxos.core.message.AdoptedMessage;
-import ru.itmo.rusinov.consensus.paxos.core.message.P1aMessage;
-import ru.itmo.rusinov.consensus.paxos.core.message.P1bMessage;
-import ru.itmo.rusinov.consensus.paxos.core.message.PreemptedMessage;
 
 import java.util.HashSet;
 import java.util.UUID;
@@ -14,13 +12,13 @@ import java.util.UUID;
 @Slf4j
 public class Scout implements Runnable {
 
-    private final UUID replicaId;
+    private final String replicaId;
     private final UUID id;
     private final Environment environment;
     private final Config config;
     private final BallotNumber ballotNumber;
 
-    public Scout(UUID replicaId, UUID id, Environment environment, Config config, BallotNumber ballotNumber) {
+    public Scout(String replicaId, UUID id, Environment environment, Config config, BallotNumber ballotNumber) {
         this.replicaId = replicaId;
         this.id = id;
         this.environment = environment;
@@ -30,29 +28,54 @@ public class Scout implements Runnable {
 
     @Override
     public void run() {
-        var waitFor = new HashSet<UUID>();
+        var waitFor = new HashSet<String>();
 
-        for (UUID a : config.replicas()) {
-            environment.sendMessage(a, new P1aMessage(replicaId, id, ballotNumber));
-            waitFor.add(a);
+        for (String r : config.replicas()) {
+            var p1a = P1aMessage.newBuilder()
+                    .setScoutId(id.toString())
+                    .setBallotNumber(ballotNumber);
+            var p1aMessage = PaxosMessage.newBuilder()
+                    .setSrc(this.replicaId)
+                    .setP1A(p1a)
+                    .build();
+            environment.sendMessage(r, p1aMessage);
+            waitFor.add(r);
         }
 
         var pvalues = new HashSet<Pvalue>();
         while (true) {
             var msg = environment.getNextScoutMessage(id);
+            if (!msg.getMessageCase().equals(PaxosMessage.MessageCase.P1B)) {
+                continue;
+            }
 
-            if (msg instanceof P1bMessage p1b) {
-                if (ballotNumber.equals(p1b.ballotNumber()) && waitFor.contains(p1b.src())) {
-                    pvalues.addAll(p1b.accepted());
-                    waitFor.remove(p1b.src());
-                    if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
-                        environment.sendMessage(replicaId, new AdoptedMessage(replicaId, this.ballotNumber, pvalues));
-                        break;
-                    }
-                } else {
-                    environment.sendMessage(replicaId, new PreemptedMessage(replicaId, p1b.ballotNumber()));
+            var p1b = msg.getP1B();
+
+            if (ballotNumber.equals(p1b.getBallotNumber()) && waitFor.contains(msg.getSrc())) {
+                pvalues.addAll(p1b.getAcceptedList());
+                waitFor.remove(msg.getSrc());
+                if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
+                    var am = AdoptedMessage.newBuilder()
+                            .setBallotNumber(ballotNumber)
+                            .addAllAccepted(pvalues);
+                    var amMessage = PaxosMessage.newBuilder()
+                            .setSrc(replicaId)
+                            .setAdopted(am)
+                            .build();
+
+                    environment.sendMessage(replicaId, amMessage);
                     break;
                 }
+            } else {
+                var pm = PreemptedMessage.newBuilder()
+                        .setBallotNumber(p1b.getBallotNumber());
+                var pmMessage = PaxosMessage.newBuilder()
+                        .setSrc(replicaId)
+                        .setPreempted(pm)
+                        .build();
+
+                environment.sendMessage(replicaId, pmMessage);
+                break;
             }
         }
     }

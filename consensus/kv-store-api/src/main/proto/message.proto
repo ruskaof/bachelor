@@ -1,0 +1,19 @@
+syntax="proto3";
+
+package ru.itmo.rusinov;
+
+message GetMessage {
+  bytes key = 1;
+}
+
+message SetMessage {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+message KvStoreProtoMessage {
+  oneof message {
+    GetMessage get = 1;
+    SetMessage set = 2;
+  }
+}

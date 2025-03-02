@@ -1,13 +1,11 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
 import lombok.extern.slf4j.Slf4j;
-import ru.itmo.rusinov.consensus.paxos.core.command.Command;
+import paxos.Paxos;
+import paxos.Paxos.Command;
 import ru.itmo.rusinov.consensus.paxos.core.command.ReconfigCommand;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
-import ru.itmo.rusinov.consensus.paxos.core.message.DecisionMessage;
-import ru.itmo.rusinov.consensus.paxos.core.message.ProposeMessage;
-import ru.itmo.rusinov.consensus.paxos.core.message.RequestMessage;
 
 import java.util.*;
 
@@ -25,11 +23,11 @@ public class Replica {
 
     private final Environment environment;
     private final StateMachine stateMachine;
-    private final UUID id;
+    private final String id;
 
     private Config config;
 
-    public Replica(Environment environment, StateMachine stateMachine, UUID id, Config config) {
+    public Replica(Environment environment, StateMachine stateMachine, String id, Config config) {
         this.environment = environment;
         this.stateMachine = stateMachine;
         this.id = id;
@@ -39,15 +37,24 @@ public class Replica {
     private void propose() {
         while (this.slotIn < this.slotOut + WINDOW && !this.requests.isEmpty()) {
             if (this.slotIn > WINDOW && this.decisions.containsKey(this.slotIn - WINDOW)) {
-                if (this.decisions.get(this.slotIn - WINDOW) instanceof ReconfigCommand rc) {
-                    this.config = rc.config();
-                }
+                // todo handle reconfig command if needed
+//                if (this.decisions.get(this.slotIn - WINDOW) instanceof ReconfigCommand rc) {
+//                    this.config = rc.config();
+//                }
             }
             if (!decisions.containsKey(this.slotIn)) {
                 var cmd = this.requests.poll();
                 this.proposals.put(this.slotIn, cmd);
-                for (UUID l : config.replicas()) {
-                    this.environment.sendMessage(l, new ProposeMessage(this.id, this.slotIn, cmd));
+                for (String l : config.replicas()) {
+                    var pm = Paxos.ProposeMessage.newBuilder()
+                            .setSlotNumber(slotIn)
+                            .setCommand(cmd);
+                    var pmMessage = Paxos.PaxosMessage.newBuilder()
+                            .setSrc(this.id)
+                            .setPropose(pm)
+                            .build();
+
+                    this.environment.sendMessage(l, pmMessage);
                 }
             }
             this.slotIn++;
@@ -61,10 +68,11 @@ public class Replica {
                 return;
             }
         }
-        if (cmd instanceof ReconfigCommand) {
-            this.slotOut++;
-            return;
-        }
+        // todo for reconfig command
+//        if (cmd instanceof ReconfigCommand) {
+//            this.slotOut++;
+//            return;
+//        }
         this.stateMachine.applyCommand(cmd);
         this.slotOut++;
     }
@@ -74,18 +82,24 @@ public class Replica {
         while (true) {
             var msg = environment.getNextReplicaMessage();
             log.info("Handling message: {}", msg);
-            if (msg instanceof RequestMessage rm) {
-                this.requests.add(rm.command());
-            } else if (msg instanceof DecisionMessage dm) {
-                this.decisions.put(dm.slotNumber(), dm.command());
-                while (this.decisions.containsKey(this.slotOut)) {
-                    if (this.proposals.containsKey(this.slotOut)) {
-                        if (!this.proposals.get(this.slotOut).equals(this.decisions.get(this.slotOut))) {
-                            this.requests.add(this.proposals.get(this.slotOut));
+
+            switch (msg.getMessageCase()) {
+                case REQUEST -> {
+                    var rm = msg.getRequest();
+                    this.requests.add(rm.getCommand());
+                }
+                case DECISION -> {
+                    var dm = msg.getDecision();
+                    this.decisions.put(dm.getSlotNumber(), dm.getCommand());
+                    while (this.decisions.containsKey(this.slotOut)) {
+                        if (this.proposals.containsKey(this.slotOut)) {
+                            if (!this.proposals.get(this.slotOut).equals(this.decisions.get(this.slotOut))) {
+                                this.requests.add(this.proposals.get(this.slotOut));
+                            }
+                            this.proposals.remove(this.slotOut);
                         }
-                        this.proposals.remove(this.slotOut);
+                        this.perform(this.decisions.get(this.slotOut));
                     }
-                    this.perform(this.decisions.get(this.slotOut));
                 }
             }
             this.propose();

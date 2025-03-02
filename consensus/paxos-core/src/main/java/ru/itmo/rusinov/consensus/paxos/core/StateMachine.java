@@ -1,9 +1,12 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
-import ru.itmo.rusinov.consensus.paxos.core.command.Command;
+import paxos.Paxos;
 import ru.itmo.rusinov.consensus.paxos.core.command.CommandResult;
+
+import java.io.File;
 
 public interface StateMachine {
 
-    CommandResult applyCommand(Command command);
+    void initialize(File stateMachineDir);
+    CommandResult applyCommand(Paxos.Command command);
 }

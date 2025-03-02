@@ -15,19 +15,17 @@ public class ThreeReplicas {
     public static void main(String[] args) {
         var localhost = "localhost";
         var destinations = Map.of(
-                new UUID(0, 0), new InetSocketAddress(localhost, 7910),
-                new UUID(0, 1), new InetSocketAddress(localhost, 7911),
-                new UUID(0, 2), new InetSocketAddress(localhost, 7912)
+                "0", new InetSocketAddress(localhost, 7910),
+                "1", new InetSocketAddress(localhost, 7911),
+                "2", new InetSocketAddress(localhost, 7912)
         );
         var config = new Config(Set.of(
-                new UUID(0, 0),
-                new UUID(0, 1),
-                new UUID(0, 2)
+                "0", "1", "2"
         ));
 
-        var server1 = new PaxosServer(new UUID(0, 0), new LoggingNopStateMachine(), new TCPSocketEnvironment(7910, destinations), config);
-        var server2 = new PaxosServer(new UUID(0, 1), new LoggingNopStateMachine(), new TCPSocketEnvironment(7911, destinations), config);
-        var server3 = new PaxosServer(new UUID(0, 2), new LoggingNopStateMachine(), new TCPSocketEnvironment(7912, destinations), config);
+        var server1 = new PaxosServer("0", new LoggingNopStateMachine(), new TCPSocketEnvironment(7910, destinations), config);
+        var server2 = new PaxosServer("1", new LoggingNopStateMachine(), new TCPSocketEnvironment(7911, destinations), config);
+        var server3 = new PaxosServer("2", new LoggingNopStateMachine(), new TCPSocketEnvironment(7912, destinations), config);
 
         server1.start();
         server2.start();

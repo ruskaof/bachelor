@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package paxos;
+
+message BallotNumber {
+  int64 round = 1;
+  string leader_id = 2;
+}
+
+message Pvalue {
+  BallotNumber ballot_number = 1;
+  int64 slot_number = 2;
+  Command command = 3;
+}
+
+message Command {
+  bytes content = 1;
+}
+
+message CommandResult {
+  bytes content = 1;
+}
+
+message PaxosMessage {
+  string src = 1;
+
+  oneof message {
+    AdoptedMessage adopted = 2;
+    DecisionMessage decision = 3;
+    P1aMessage p1a = 4;
+    P1bMessage p1b = 5;
+    P2aMessage p2a = 6;
+    P2bMessage p2b = 7;
+    PreemptedMessage preempted = 8;
+    ProposeMessage propose = 9;
+    RequestMessage request = 10;
+  }
+}
+
+message AdoptedMessage {
+  BallotNumber ballot_number = 1;
+  repeated Pvalue accepted = 2;
+}
+
+message DecisionMessage {
+  int64 slot_number = 1;
+  Command command = 2;
+}
+
+message P1aMessage {
+  string scout_id = 1;
+  BallotNumber ballot_number = 2;
+}
+
+message P1bMessage {
+  BallotNumber ballot_number = 1;
+  repeated Pvalue accepted = 2;
+  string scout_id = 3;
+}
+
+message P2aMessage {
+  BallotNumber ballot_number = 1;
+  int64 slot_number = 2;
+  Command command = 3;
+  string commander_id = 4;
+}
+
+message P2bMessage {
+  BallotNumber ballot_number = 1;
+  int64 slot_number = 2;
+  string commander_id = 3;
+}
+
+message PreemptedMessage {
+  BallotNumber ballot_number = 1;
+}
+
+message ProposeMessage {
+  int64 slot_number = 1;
+  Command command = 2;
+}
+
+message RequestMessage {
+  Command command = 1;
+}

@@ -1,4 +1,4 @@
-package ru.itmo.rusinov.consensus.kv.store.client.ratis;
+package ru.itmo.rusinov.consensus.kv.store.client.paxos;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.ratis.client.RaftClient;
@@ -6,12 +6,13 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import ru.itmo.rusinov.consensus.kv.store.api.ratis.GetMessage;
 import ru.itmo.rusinov.consensus.kv.store.api.ratis.SetMessage;
+import ru.itmo.rusinov.consensus.kv.store.client.ConsensusClient;
 
 import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
-public class KvStoreRatisClient {
+public class KvStorePaxosClient implements ConsensusClient {
     private final RaftClient client;
 
     public Mono<Void> setStringValue(String key, String value) {

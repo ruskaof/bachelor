@@ -1,12 +1,14 @@
 package ru.itmo.rusinov.consensus.paxos.core.environment;
 
-import ru.itmo.rusinov.consensus.paxos.core.message.PaxosMessage;
+
+import paxos.Paxos;
+import paxos.Paxos.PaxosMessage;
 
 import java.util.UUID;
 
 public interface Environment {
 
-    void sendMessage(UUID destination, PaxosMessage paxosMessage);
+    void sendMessage(String destination, PaxosMessage paxosMessage);
     PaxosMessage getNextAcceptorMessage();
     PaxosMessage getNextLeaderMessage();
     PaxosMessage getNextScoutMessage(UUID scoutId);

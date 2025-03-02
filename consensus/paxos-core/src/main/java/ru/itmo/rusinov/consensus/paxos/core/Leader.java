@@ -6,73 +6,84 @@ import java.util.concurrent.Executors;
 
 
 import lombok.extern.slf4j.Slf4j;
-import ru.itmo.rusinov.consensus.paxos.core.command.Command;
+import paxos.Paxos;
+import paxos.Paxos.BallotNumber;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
-import ru.itmo.rusinov.consensus.paxos.core.message.*;
 
 @Slf4j
 public class Leader {
 
-    private final UUID id;
-    private final Map<Long, Command> proposals = new HashMap<>();
+    private final String id;
+    private final Map<Long, Paxos.Command> proposals = new HashMap<>();
     private boolean active = true;
     private BallotNumber ballotNumber;
+    private final BallotNumberComparator ballotNumberComparator = new BallotNumberComparator();
 
     private final Environment environment;
     private final Config config;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public Leader(UUID id, Environment environment, Config config) {
+    public Leader(String id, Environment environment, Config config) {
         this.id = id;
         this.environment = environment;
         this.config = config;
-        this.ballotNumber = new BallotNumber(0, id);
+        this.ballotNumber = BallotNumber.newBuilder()
+                .setLeaderId(id)
+                .setRound(0)
+                .build();
     }
 
     public void run() {
         log.info("Starting leader {}", id);
-        // fixme handle in environment
         executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
         while (true) {
             handleMessage(this.environment.getNextLeaderMessage());
         }
     }
 
-    private void handleMessage(PaxosMessage message) {
+    private void handleMessage(Paxos.PaxosMessage message) {
         log.info("Handling message: {}", message);
 
-        switch (message) {
-            case ProposeMessage pm -> {
-                this.proposals.putIfAbsent(pm.slotNumber(), pm.command());
+        switch (message.getMessageCase()) {
+            case PROPOSE -> {
+                var pm = message.getPropose();
+                this.proposals.putIfAbsent(pm.getSlotNumber(), pm.getCommand());
                 if (this.active) {
-                    executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.command(), pm.slotNumber()));
+                    executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.getCommand(), pm.getSlotNumber()));
                 }
             }
-            case AdoptedMessage am -> {
-                if (this.ballotNumber.equals(am.ballotNumber())) {
-                    var max = new HashMap<Long, BallotNumber>();
+            case ADOPTED -> {
+                var am = message.getAdopted();
+                if (!this.ballotNumber.equals(am.getBallotNumber())) {
+                    return;
+                }
 
-                    for (Pvalue pv : am.accepted()) {
-                        var bn = max.get(pv.slotNumber());
-                        if (Objects.isNull(bn) || bn.compareTo(pv.ballotNumber()) < 0) {
-                            max.put(pv.slotNumber(), pv.ballotNumber());
-                            this.proposals.put(pv.slotNumber(), pv.command());
-                        }
+                var max = new HashMap<Long, BallotNumber>();
 
+                for (Paxos.Pvalue pv : am.getAcceptedList()) {
+                    var bn = max.get(pv.getSlotNumber());
+                    if (Objects.isNull(bn) || ballotNumberComparator.compare(bn, pv.getBallotNumber()) < 0) {
+                        max.put(pv.getSlotNumber(), pv.getBallotNumber());
+                        this.proposals.put(pv.getSlotNumber(), pv.getCommand());
                     }
-                    this.proposals.forEach((sn, c) ->
-                                    executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, c, sn)));
-                    this.active = true;
+
                 }
+                this.proposals.forEach((sn, c) ->
+                        executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, c, sn)));
+                this.active = true;
             }
-            case PreemptedMessage pm -> {
-                if (pm.ballotNumber().compareTo(this.ballotNumber) > 0) {
-                    this.ballotNumber = new BallotNumber(pm.ballotNumber().round() + 1, this.id);
+            case PREEMPTED -> {
+                var pm = message.getPreempted();
+                if (ballotNumberComparator.compare(pm.getBallotNumber(), this.ballotNumber) > 0) {
+                    this.ballotNumber = BallotNumber.newBuilder()
+                            .setRound(pm.getBallotNumber().getRound() + 1)
+                            .setLeaderId(this.id)
+                            .build();
                     executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
+                    this.active = false;
                 }
-                this.active = false;
             }
 
             default -> log.error("Unknown message: {}", message);

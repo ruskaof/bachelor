@@ -1,8 +1,9 @@
 package ru.itmo.rusinov.consensus.paxos.core.environment.tcp;
 
+import com.google.protobuf.CodedOutputStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import ru.itmo.rusinov.consensus.paxos.core.message.PaxosMessage;
+import paxos.Paxos;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -13,7 +14,7 @@ import java.net.Socket;
 public class SocketManager {
     private final InetSocketAddress address;
     private volatile Socket socket;
-    private volatile ObjectOutputStream out;
+    private volatile CodedOutputStream out;
 
     public SocketManager(InetSocketAddress address) {
         this.address = address;
@@ -26,7 +27,7 @@ public class SocketManager {
         for (int attempt = 1; ; attempt++) {
             try {
                 socket = new Socket(address.getHostName(), address.getPort());
-                out = new ObjectOutputStream(socket.getOutputStream());
+                out = CodedOutputStream.newInstance(socket.getOutputStream());
                 log.info("Connected to {}", address);
                 return;
             } catch (IOException e) {
@@ -36,13 +37,13 @@ public class SocketManager {
         }
     }
 
-    public synchronized void sendMessage(PaxosMessage paxosMessage) {
+    public synchronized void sendMessage(Paxos.PaxosMessage paxosMessage) {
         if (socket == null || socket.isClosed()) {
             connect();
         }
         if (socket != null && out != null) {
             try {
-                out.writeObject(paxosMessage);
+                out.writeMessageNoTag(paxosMessage);
                 out.flush();
             } catch (IOException e) {
                 log.error("Error sending message:", e);
@@ -53,7 +54,6 @@ public class SocketManager {
 
     @SneakyThrows
     private synchronized void close() {
-        if (out != null) out.close();
         if (socket != null) socket.close();
     }
 }
