@@ -9,6 +9,7 @@ public record P2aMessage(
         UUID src,
         BallotNumber ballotNumber,
         long slotNumber,
-        Command command
+        Command command,
+        UUID commanderId
 ) implements PaxosMessage {
 }

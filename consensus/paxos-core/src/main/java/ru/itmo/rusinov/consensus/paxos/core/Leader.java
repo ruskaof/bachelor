@@ -1,6 +1,9 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 
 import lombok.extern.slf4j.Slf4j;
 import ru.itmo.rusinov.consensus.paxos.core.command.Command;
@@ -19,6 +22,8 @@ public class Leader {
     private final Environment environment;
     private final Config config;
 
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+
     public Leader(UUID id, Environment environment, Config config) {
         this.id = id;
         this.environment = environment;
@@ -28,7 +33,8 @@ public class Leader {
 
     public void run() {
         log.info("Starting leader {}", id);
-        launchScout();
+        // fixme handle in environment
+        executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
         while (true) {
             handleMessage(this.environment.getNextLeaderMessage());
         }
@@ -41,7 +47,7 @@ public class Leader {
             case ProposeMessage pm -> {
                 this.proposals.putIfAbsent(pm.slotNumber(), pm.command());
                 if (this.active) {
-                    launchCommander(this.ballotNumber, pm.slotNumber(), pm.command());
+                    executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.command(), pm.slotNumber()));
                 }
             }
             case AdoptedMessage am -> {
@@ -56,76 +62,20 @@ public class Leader {
                         }
 
                     }
-                    this.proposals.forEach((sn, c) -> {
-                        launchCommander(this.ballotNumber, sn, c);
-                    });
+                    this.proposals.forEach((sn, c) ->
+                                    executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, c, sn)));
                     this.active = true;
                 }
             }
             case PreemptedMessage pm -> {
                 if (pm.ballotNumber().compareTo(this.ballotNumber) > 0) {
                     this.ballotNumber = new BallotNumber(pm.ballotNumber().round() + 1, this.id);
-                    launchScout();
+                    executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
                 }
                 this.active = false;
             }
 
             default -> log.error("Unknown message: {}", message);
-        }
-    }
-
-    private void launchScout() {
-        var waitFor = new HashSet<UUID>();
-
-        for (UUID a : this.config.replicas()) {
-            this.environment.sendMessage(a, new P1aMessage(this.id, this.ballotNumber));
-            waitFor.add(a);
-        }
-
-        var pvalues = new HashSet<Pvalue>();
-        while (true) {
-            var msg = this.environment.getNextLeaderMessage();
-
-            if (msg instanceof P1bMessage p1b) {
-                if (this.ballotNumber.equals(p1b.ballotNumber()) && waitFor.contains(p1b.src())) {
-                    pvalues.addAll(p1b.accepted());
-                    waitFor.remove(p1b.src());
-                    if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
-                        this.handleMessage(new AdoptedMessage(this.id, this.ballotNumber, pvalues));
-                        break;
-                    }
-                } else {
-                    this.handleMessage(new PreemptedMessage(this.id, p1b.ballotNumber()));
-                    break;
-                }
-            }
-        }
-    }
-
-    private void launchCommander(BallotNumber ballotNumber, Long slotNumber, Command command) {
-        var waitFor = new HashSet<UUID>();
-
-        for (UUID a : this.config.replicas()) {
-            this.environment.sendMessage(a, new P2aMessage(this.id, ballotNumber, slotNumber, command));
-            waitFor.add(a);
-        }
-
-        while (true) {
-            var msg = environment.getNextLeaderMessage();
-            if (msg instanceof P2bMessage p2b) {
-                if (ballotNumber.equals(p2b.ballotNumber()) && waitFor.contains(p2b.src())) {
-                    waitFor.remove(p2b.src());
-                    if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
-                        for (UUID r : this.config.replicas()) {
-                            this.environment.sendMessage(r, new DecisionMessage(this.id, slotNumber, command));
-                        }
-                        break;
-                    }
-                } else {
-                    this.handleMessage(new PreemptedMessage(this.id, p2b.ballotNumber()));
-                    break;
-                }
-            }
         }
     }
 }

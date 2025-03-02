@@ -9,5 +9,7 @@ public interface Environment {
     void sendMessage(UUID destination, PaxosMessage paxosMessage);
     PaxosMessage getNextAcceptorMessage();
     PaxosMessage getNextLeaderMessage();
+    PaxosMessage getNextScoutMessage(UUID scoutId);
+    PaxosMessage getNextCommanderMessage(UUID commanderId);
     PaxosMessage getNextReplicaMessage();
 }

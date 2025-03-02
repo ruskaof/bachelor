@@ -9,6 +9,7 @@ import java.util.UUID;
 public record P1bMessage(
         UUID src,
         BallotNumber ballotNumber,
-        Set<Pvalue> accepted
+        Set<Pvalue> accepted,
+        UUID scoutId
 ) implements PaxosMessage {
 }

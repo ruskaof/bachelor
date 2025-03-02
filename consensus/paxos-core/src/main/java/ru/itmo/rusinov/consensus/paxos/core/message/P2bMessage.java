@@ -7,6 +7,7 @@ import java.util.UUID;
 public record P2bMessage(
         UUID src,
         BallotNumber ballotNumber,
-        long slotNumber
+        long slotNumber,
+        UUID commanderId
 ) implements PaxosMessage {
 }

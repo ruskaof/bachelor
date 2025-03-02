@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record P1aMessage(
         UUID src,
+        UUID scoutId,
         BallotNumber ballotNumber
 ) implements PaxosMessage {
 }

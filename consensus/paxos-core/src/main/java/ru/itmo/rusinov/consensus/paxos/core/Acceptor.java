@@ -35,13 +35,13 @@ public class Acceptor {
                     if (p1a.ballotNumber().compareTo(this.ballotNumber) > 0) {
                         this.ballotNumber = p1a.ballotNumber();
                     }
-                    environment.sendMessage(p1a.src(), new P1bMessage(this.id, this.ballotNumber, this.accepted));
+                    environment.sendMessage(p1a.src(), new P1bMessage(this.id, this.ballotNumber, this.accepted, p1a.scoutId()));
                 }
                 case P2aMessage p2a -> {
                     if (p2a.ballotNumber().equals(this.ballotNumber)) {
                         this.accepted.add(new Pvalue(p2a.ballotNumber(), p2a.slotNumber(), p2a.command()));
                     }
-                    environment.sendMessage(p2a.src(), new P2bMessage(this.id, this.ballotNumber, p2a.slotNumber()));
+                    environment.sendMessage(p2a.src(), new P2bMessage(this.id, this.ballotNumber, p2a.slotNumber(), p2a.commanderId()));
                 }
                 default -> {
                     log.error("Unexpected message: {}", msg);

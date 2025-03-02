@@ -19,6 +19,9 @@ public class TCPSocketEnvironment implements Environment {
     private final BlockingQueue<PaxosMessage> replicaQueue = new LinkedBlockingQueue<>();
     private final BlockingQueue<PaxosMessage> leaderQueue = new LinkedBlockingQueue<>();
 
+    private final ConcurrentHashMap<UUID, LinkedBlockingQueue<PaxosMessage>> commanderQueues = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, LinkedBlockingQueue<PaxosMessage>> scoutQueues = new ConcurrentHashMap<>();
+
     private final int serverPort;
     private ServerSocket serverSocket;
 
@@ -59,6 +62,22 @@ public class TCPSocketEnvironment implements Environment {
     @Override
     public PaxosMessage getNextLeaderMessage() {
         return leaderQueue.take();
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosMessage getNextScoutMessage(UUID scoutId) {
+        scoutQueues.putIfAbsent(scoutId, new LinkedBlockingQueue<>());
+        var queue = scoutQueues.get(scoutId);
+        return queue.take();
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosMessage getNextCommanderMessage(UUID commanderId) {
+        commanderQueues.putIfAbsent(commanderId, new LinkedBlockingQueue<>());
+        var queue = commanderQueues.get(commanderId);
+        return queue.take();
     }
 
     @SneakyThrows
@@ -121,8 +140,13 @@ public class TCPSocketEnvironment implements Environment {
             case DecisionMessage dm -> replicaQueue.put(dm);
 
             case ProposeMessage pm -> leaderQueue.put(pm);
-            case P1bMessage p1b -> leaderQueue.put(p1b);
-            case P2bMessage p2b -> leaderQueue.put(p2b);
+            case AdoptedMessage am -> leaderQueue.put(am);
+            case PreemptedMessage pm -> leaderQueue.put(pm);
+
+            case P1bMessage p1b -> scoutQueues
+                    .computeIfAbsent(p1b.scoutId(), (uuid -> new LinkedBlockingQueue<>())).put(p1b);
+            case P2bMessage p2b -> commanderQueues
+                    .computeIfAbsent(p2b.commanderId(), (uuid -> new LinkedBlockingQueue<>())).put(p2b);
 
             case P1aMessage p1a -> acceptorQueue.put(p1a);
             case P2aMessage p2a -> acceptorQueue.put(p2a);
