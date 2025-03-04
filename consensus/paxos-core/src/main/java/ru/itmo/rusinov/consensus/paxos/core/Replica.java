@@ -1,9 +1,9 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
+import ch.qos.logback.core.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
 import paxos.Paxos.Command;
-import ru.itmo.rusinov.consensus.paxos.core.command.ReconfigCommand;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
 
@@ -61,7 +61,7 @@ public class Replica {
         }
     }
 
-    private void perform(Command cmd) {
+    private void perform(Command cmd, boolean sendResponse) {
         for (long s = 0; s < this.slotOut; s++) {
             if (this.decisions.get(s) == cmd) {
                 this.slotOut++;
@@ -73,7 +73,10 @@ public class Replica {
 //            this.slotOut++;
 //            return;
 //        }
-        this.stateMachine.applyCommand(cmd);
+        var result = this.stateMachine.applyCommand(cmd);
+        if (sendResponse) {
+            this.environment.sendResponse(cmd.getClientId(), result);
+        }
         this.slotOut++;
     }
 
@@ -92,13 +95,16 @@ public class Replica {
                     var dm = msg.getDecision();
                     this.decisions.put(dm.getSlotNumber(), dm.getCommand());
                     while (this.decisions.containsKey(this.slotOut)) {
+                        boolean sendResponse = false;
                         if (this.proposals.containsKey(this.slotOut)) {
                             if (!this.proposals.get(this.slotOut).equals(this.decisions.get(this.slotOut))) {
                                 this.requests.add(this.proposals.get(this.slotOut));
+                            } else {
+                                sendResponse = true;
                             }
                             this.proposals.remove(this.slotOut);
                         }
-                        this.perform(this.decisions.get(this.slotOut));
+                        this.perform(this.decisions.get(this.slotOut), sendResponse);
                     }
                 }
             }

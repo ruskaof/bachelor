@@ -33,7 +33,6 @@ public class ClientsConfiguration {
     }
 
     @Bean
-    @Primary
     public PaxosClient paxosClient(PeerConfigurationProperties peerConfigurationProperties) {
         return new PaxosClient(peerConfigurationProperties.peers().stream().collect(Collectors.toMap(PeerConfigurationProperties.PeerConfiguration::id, (p) -> {
             var parts = p.address().split(":");

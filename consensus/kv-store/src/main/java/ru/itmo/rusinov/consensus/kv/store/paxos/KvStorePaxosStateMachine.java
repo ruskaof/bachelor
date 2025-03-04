@@ -1,11 +1,12 @@
 package ru.itmo.rusinov.consensus.kv.store.paxos;
 
+import com.google.protobuf.ByteString;
 import lombok.SneakyThrows;
 import paxos.Paxos;
+import paxos.Paxos.CommandResult;
 import ru.itmo.rusinov.Message;
 import ru.itmo.rusinov.consensus.kv.store.db.KvDatabase;
 import ru.itmo.rusinov.consensus.paxos.core.StateMachine;
-import ru.itmo.rusinov.consensus.paxos.core.command.CommandResult;
 
 import java.io.File;
 import java.util.Objects;
@@ -43,13 +44,16 @@ public class KvStorePaxosStateMachine implements StateMachine {
 
     private CommandResult handleSet(Message.SetMessage set) {
         database.put(set.getKey().toByteArray(), set.getValue().toByteArray());
-        return () -> new byte[0];
+        return CommandResult.getDefaultInstance();
     }
 
     private CommandResult handleGet(Message.GetMessage get) {
-        return () -> {
-            var result = database.get(get.getKey().toByteArray());
-            return Objects.requireNonNullElseGet(result, () -> new byte[0]);
-        };
+        var bytes = database.get(get.getKey().toByteArray());
+        var builder = CommandResult.newBuilder();
+        if (Objects.nonNull(bytes)) {
+            builder.setContent(ByteString.copyFrom(bytes));
+        }
+
+        return builder.build();
     }
 }

@@ -57,7 +57,7 @@ public class Commander implements Runnable {
             if (ballotNumber.equals(p2b.getBallotNumber()) && waitFor.contains(msg.getSrc())) {
                 waitFor.remove(msg.getSrc());
                 if (waitFor.size() < (this.config.replicas().size() + 1) / 2) {
-                    for (String replicaId : this.config.replicas()) {
+                    for (String r : this.config.replicas()) {
                         var dm = DecisionMessage.newBuilder()
                                 .setSlotNumber(slotNumber)
                                 .setCommand(command);
@@ -65,7 +65,7 @@ public class Commander implements Runnable {
                                 .setSrc(this.replicaId)
                                 .setDecision(dm)
                                 .build();
-                        this.environment.sendMessage(replicaId, dmMessage);
+                        this.environment.sendMessage(r, dmMessage);
                     }
                     break;
                 }

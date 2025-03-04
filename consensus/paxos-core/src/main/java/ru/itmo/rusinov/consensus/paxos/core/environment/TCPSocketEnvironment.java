@@ -1,8 +1,8 @@
 package ru.itmo.rusinov.consensus.paxos.core.environment;
 
-import com.google.protobuf.CodedInputStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import paxos.Paxos;
 import paxos.Paxos.PaxosMessage;
 import ru.itmo.rusinov.consensus.paxos.core.environment.tcp.SocketManager;
 
@@ -15,6 +15,7 @@ import java.util.concurrent.*;
 public class TCPSocketEnvironment implements Environment {
     private final Map<String, InetSocketAddress> destinationMap = new ConcurrentHashMap<>();
     private final Map<String, SocketManager> socketManagers = new ConcurrentHashMap<>();
+    private final Map<String, OutputStream> clientOutputs = new ConcurrentHashMap<>();
 
     private final BlockingQueue<PaxosMessage> acceptorQueue = new LinkedBlockingQueue<>();
     private final BlockingQueue<PaxosMessage> replicaQueue = new LinkedBlockingQueue<>();
@@ -53,6 +54,21 @@ public class TCPSocketEnvironment implements Environment {
         socketManagers.computeIfAbsent(destination, k -> new SocketManager(address)).sendMessage(paxosMessage);
     }
 
+    @Override
+    public void sendResponse(String clientId, Paxos.CommandResult response) {
+        try {
+            OutputStream outputStream = clientOutputs.get(clientId);
+            if (outputStream != null) {
+                response.writeDelimitedTo(outputStream);
+                log.debug("Sent response to client: {}", clientId);
+            } else {
+                log.warn("No output stream found for client: {}", clientId);
+            }
+        } catch (IOException e) {
+            log.error("Failed to send response to client: {}", clientId, e);
+        }
+    }
+
     @SneakyThrows
     @Override
     public PaxosMessage getNextAcceptorMessage() {
@@ -69,16 +85,14 @@ public class TCPSocketEnvironment implements Environment {
     @Override
     public PaxosMessage getNextScoutMessage(UUID scoutId) {
         scoutQueues.putIfAbsent(scoutId.toString(), new LinkedBlockingQueue<>());
-        var queue = scoutQueues.get(scoutId.toString());
-        return queue.take();
+        return scoutQueues.get(scoutId.toString()).take();
     }
 
     @SneakyThrows
     @Override
     public PaxosMessage getNextCommanderMessage(UUID commanderId) {
         commanderQueues.putIfAbsent(commanderId.toString(), new LinkedBlockingQueue<>());
-        var queue = commanderQueues.get(commanderId.toString());
-        return queue.take();
+        return commanderQueues.get(commanderId.toString()).take();
     }
 
     @SneakyThrows
@@ -105,9 +119,12 @@ public class TCPSocketEnvironment implements Environment {
 
     private class MessageHandler implements Runnable {
         private final Socket socket;
+        private final OutputStream outputStream;
+        private String clientId;
 
-        public MessageHandler(Socket socket) {
+        public MessageHandler(Socket socket) throws IOException {
             this.socket = socket;
+            this.outputStream = socket.getOutputStream();
         }
 
         @SneakyThrows
@@ -117,6 +134,12 @@ public class TCPSocketEnvironment implements Environment {
                 while (true) {
                     try {
                         PaxosMessage message = PaxosMessage.parseDelimitedFrom(socket.getInputStream());
+
+                        if (message.getMessageCase() == PaxosMessage.MessageCase.REQUEST) {
+                            clientId = message.getRequest().getCommand().getClientId();
+                            clientOutputs.put(message.getRequest().getCommand().getClientId(), outputStream);
+                        }
+
                         putMessageToQueues(message);
                     } catch (EOFException e) {
                         log.info("Client disconnected: {}", socket.getRemoteSocketAddress());
@@ -126,6 +149,7 @@ public class TCPSocketEnvironment implements Environment {
             } catch (IOException e) {
                 log.error("Connection error: {}", e);
             } finally {
+                clientOutputs.remove(clientId);
                 socket.close();
             }
         }

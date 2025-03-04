@@ -66,13 +66,16 @@ public class PaxosClient {
         }
 
         try {
-            var message = Paxos.RequestMessage.newBuilder()
+            var request = Paxos.RequestMessage.newBuilder()
                     .setCommand(paxosCommand)
                     .build();
-            message.writeTo(socket.getOutputStream());
+            var requestMessage = Paxos.PaxosMessage.newBuilder()
+                    .setRequest(request)
+                    .build();
+            requestMessage.writeDelimitedTo(socket.getOutputStream());
             log.info("Sent command to replica {}", selectedReplica);
 
-            Paxos.CommandResult result = Paxos.CommandResult.parseFrom(socket.getInputStream());
+            Paxos.CommandResult result = Paxos.CommandResult.parseDelimitedFrom(socket.getInputStream());
             return result;
         } catch (IOException e) {
             log.error("Failed to send command to replica {}: {}", selectedReplica, e.getMessage());
@@ -112,7 +115,7 @@ public class PaxosClient {
             if (result == null) {
                 throw new RuntimeException("Failed to get value from Paxos");
             }
-            return result.getContent().toString();
+            return result.getContent().toStringUtf8();
         });
     }
 }
