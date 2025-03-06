@@ -2,8 +2,8 @@ servers:
   group-id: kvStoreRaftGroup
   peers:
     - id: 1
-      address: localhost:8081
+      address: kv-peer-1:8081
     - id: 2
-      address: localhost:8082
+      address: kv-peer-2:8082
     - id: 3
-      address: localhost:8083
+      address: kv-peer-3:8083

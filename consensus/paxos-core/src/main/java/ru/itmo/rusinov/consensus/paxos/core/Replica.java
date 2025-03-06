@@ -84,7 +84,7 @@ public class Replica {
         log.info("Starting replica {}", id);
         while (true) {
             var msg = environment.getNextReplicaMessage();
-            log.info("Handling message: {}", msg);
+            log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
 
             switch (msg.getMessageCase()) {
                 case REQUEST -> {

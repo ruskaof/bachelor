@@ -23,18 +23,16 @@ public class SocketManager {
     @SneakyThrows
     private synchronized void connect() {
         close();
-        for (int attempt = 1; ; attempt++) {
-            try {
-                socket = new Socket(address.getHostName(), address.getPort());
-                log.info("Connected to {}", address);
-                return;
-            } catch (IOException e) {
-                log.error("Connection attempt {} to {} failed: {}", attempt, address, e.getMessage());
-                Thread.sleep(1000);
-            }
+        try {
+            socket = new Socket();
+            socket.connect(address, 1000);
+            log.info("Connected to {}", address);
+        } catch (IOException e) {
+            log.warn("Connection to {} failed: {} {}", address, e.getClass().getCanonicalName(), e.getMessage());
         }
     }
 
+    @SneakyThrows
     public synchronized void sendMessage(Paxos.PaxosMessage paxosMessage) {
         if (socket == null || socket.isClosed()) {
             connect();
@@ -43,8 +41,10 @@ public class SocketManager {
             try {
                 paxosMessage.writeDelimitedTo(socket.getOutputStream());
             } catch (IOException e) {
-                log.error("Error sending message:", e);
-                connect();
+                log.warn("Could not send message to {}: {} {}",
+                        this.address, e.getClass().getCanonicalName(), e.getMessage());
+                socket.close();
+                socket = null;
             }
         }
     }

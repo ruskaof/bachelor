@@ -29,7 +29,7 @@ public class Acceptor {
         log.info("Starting acceptor {}", id);
         while (true) {
             var msg = environment.getNextAcceptorMessage();
-            log.info("Handling message: {}", msg);
+            log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
             switch (msg.getMessageCase()) {
                 case P1A -> handleP1a(msg);
                 case P2A -> handleP2a(msg);
@@ -40,13 +40,15 @@ public class Acceptor {
 
     private void handleP2a(Paxos.PaxosMessage msg) {
         var p2a = msg.getP2A();
-        if (p2a.getBallotNumber().equals(this.ballotNumber)) {
+        if (ballotNumberComparator.compare(ballotNumber, p2a.getBallotNumber()) <= 0) {
             var pvalue = Paxos.Pvalue.newBuilder()
                     .setBallotNumber(p2a.getBallotNumber())
                     .setSlotNumber(p2a.getSlotNumber())
                     .setCommand(p2a.getCommand())
                     .build();
             this.accepted.add(pvalue);
+        } else {
+            log.info("Cannot accept value because its ballot number small ({}, {}) less than ({}, {})", p2a.getBallotNumber().getRound(), p2a.getBallotNumber().getLeaderId(), ballotNumber.getRound(), ballotNumber.getLeaderId());
         }
         var p2b = Paxos.P2bMessage.newBuilder()
                 .setBallotNumber(this.ballotNumber)

@@ -44,7 +44,7 @@ public class Leader {
     }
 
     private void handleMessage(Paxos.PaxosMessage message) {
-        log.info("Handling message: {}", message);
+        log.info("Handling message {} from {}", message.getMessageCase(), message.getSrc());
 
         switch (message.getMessageCase()) {
             case PROPOSE -> {
@@ -83,6 +83,8 @@ public class Leader {
                             .build();
                     executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
                     this.active = false;
+                } else {
+                    log.info("Preempted is ignored because ({}, {}) less than ({}, {})", pm.getBallotNumber().getRound(), pm.getBallotNumber().getLeaderId(), ballotNumber.getRound(), ballotNumber.getLeaderId());
                 }
             }
 

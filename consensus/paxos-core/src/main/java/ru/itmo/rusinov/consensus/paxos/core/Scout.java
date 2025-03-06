@@ -28,6 +28,8 @@ public class Scout implements Runnable {
 
     @Override
     public void run() {
+        log.info("Running scout with id {}", id);
+
         var waitFor = new HashSet<String>();
 
         for (String r : config.replicas()) {
@@ -45,6 +47,8 @@ public class Scout implements Runnable {
         var pvalues = new HashSet<Pvalue>();
         while (true) {
             var msg = environment.getNextScoutMessage(id);
+            log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
+
             if (!msg.getMessageCase().equals(PaxosMessage.MessageCase.P1B)) {
                 continue;
             }

@@ -44,6 +44,8 @@ public class TCPSocketEnvironment implements Environment {
 
     @Override
     public void sendMessage(String destination, PaxosMessage paxosMessage) {
+        log.info("Sending message {} from {} to {}", paxosMessage.getMessageCase(), paxosMessage.getSrc(), destination);
+
         InetSocketAddress address = destinationMap.get(destination);
         if (address == null) {
             log.error("No address found for UUID: {}", destination);
@@ -109,6 +111,7 @@ public class TCPSocketEnvironment implements Environment {
 
                 while (true) {
                     Socket clientSocket = serverSocket.accept();
+                    log.info("Accepted new connection");
                     new Thread(new MessageHandler(clientSocket), "TcpClientHandler").start();
                 }
             } catch (IOException e) {
@@ -135,6 +138,11 @@ public class TCPSocketEnvironment implements Environment {
                     try {
                         PaxosMessage message = PaxosMessage.parseDelimitedFrom(socket.getInputStream());
 
+                        if (Objects.isNull(message)) {
+                            log.info("Got null in request from client");
+                            break;
+                        }
+
                         if (message.getMessageCase() == PaxosMessage.MessageCase.REQUEST) {
                             clientId = message.getRequest().getCommand().getClientId();
                             clientOutputs.put(message.getRequest().getCommand().getClientId(), outputStream);
@@ -146,10 +154,12 @@ public class TCPSocketEnvironment implements Environment {
                         break;
                     }
                 }
-            } catch (IOException e) {
-                log.error("Connection error: {}", e);
+            } catch (Exception e) {
+                log.error("Connection error", e);
             } finally {
-                clientOutputs.remove(clientId);
+                if (clientId != null) {
+                    clientOutputs.remove(clientId);
+                }
                 socket.close();
             }
         }

@@ -20,6 +20,7 @@ public class MapDbKvDatabase implements KvDatabase {
         // Initialize the database and create or open the map
         db = DBMaker.fileDB(databaseFilePath.toFile())
                 .fileMmapEnable() // Enable memory-mapped files for better performance
+                .transactionEnable()
                 .make();
 
         // Create or open a map (HTreeMap) with byte array keys and values

@@ -1,5 +1,6 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
+import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
 import paxos.Paxos.*;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
@@ -8,6 +9,7 @@ import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
 import java.util.HashSet;
 import java.util.UUID;
 
+@Slf4j
 public class Commander implements Runnable {
 
     private final String replicaId;
@@ -48,6 +50,8 @@ public class Commander implements Runnable {
 
         while (true) {
             var msg = environment.getNextCommanderMessage(id);
+            log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
+
             if (msg.getMessageCase() != PaxosMessage.MessageCase.P2B) {
                 continue;
             }
@@ -71,7 +75,7 @@ public class Commander implements Runnable {
                 }
             } else {
                 var pm = PreemptedMessage.newBuilder()
-                        .setBallotNumber(ballotNumber);
+                        .setBallotNumber(p2b.getBallotNumber());
                 var pmMessage = PaxosMessage.newBuilder()
                         .setSrc(replicaId)
                         .setPreempted(pm)
