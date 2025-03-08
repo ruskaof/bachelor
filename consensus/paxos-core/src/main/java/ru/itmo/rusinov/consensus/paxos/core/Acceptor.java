@@ -10,6 +10,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Slf4j
 public class Acceptor {
 
@@ -17,7 +20,7 @@ public class Acceptor {
 
     private BallotNumber ballotNumber = BallotNumberComparator.MIN;
     private BallotNumberComparator ballotNumberComparator = new BallotNumberComparator();
-    private final Set<Pvalue> accepted = new HashSet<>();
+    private final Map<Long, Pvalue> accepted = new HashMap<>();
     private final String id;
 
     public Acceptor(Environment environment, String id) {
@@ -41,14 +44,17 @@ public class Acceptor {
     private void handleP2a(Paxos.PaxosMessage msg) {
         var p2a = msg.getP2A();
         if (ballotNumberComparator.compare(ballotNumber, p2a.getBallotNumber()) <= 0) {
+            ballotNumber = p2a.getBallotNumber();
             var pvalue = Paxos.Pvalue.newBuilder()
                     .setBallotNumber(p2a.getBallotNumber())
                     .setSlotNumber(p2a.getSlotNumber())
                     .setCommand(p2a.getCommand())
                     .build();
-            this.accepted.add(pvalue);
+            accepted.put(p2a.getSlotNumber(), pvalue);
         } else {
-            log.info("Cannot accept value because its ballot number small ({}, {}) less than ({}, {})", p2a.getBallotNumber().getRound(), p2a.getBallotNumber().getLeaderId(), ballotNumber.getRound(), ballotNumber.getLeaderId());
+            log.info("Cannot accept value because its ballot number ({}, {}) is less than ({}, {})",
+                    p2a.getBallotNumber().getRound(), p2a.getBallotNumber().getLeaderId(),
+                    ballotNumber.getRound(), ballotNumber.getLeaderId());
         }
         var p2b = Paxos.P2bMessage.newBuilder()
                 .setBallotNumber(this.ballotNumber)
@@ -70,7 +76,7 @@ public class Acceptor {
         }
         var p1b = Paxos.P1bMessage.newBuilder()
                 .setBallotNumber(this.ballotNumber)
-                .addAllAccepted(this.accepted)
+                .addAllAccepted(accepted.values())
                 .setScoutId(p1a.getScoutId());
         var p1bMessage = Paxos.PaxosMessage
                 .newBuilder()
