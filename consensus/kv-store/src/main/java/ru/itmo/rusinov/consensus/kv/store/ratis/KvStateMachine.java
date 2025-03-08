@@ -55,7 +55,7 @@ public class KvStateMachine extends BaseStateMachine {
         RaftProtos.LogEntryProto entry = trx.getLogEntry();
         SetMessage message = SetMessage.valueOf(entry.getStateMachineLogEntry().getLogData());
         byte[] key = message.protoMessage.getSet().getKey().toByteArray();
-        byte[] value = message.protoMessage.getSet().getKey().toByteArray();
+        byte[] value = message.protoMessage.getSet().getValue().toByteArray();
         database.put(key, value);
         return CompletableFuture.completedFuture(message);
     }
