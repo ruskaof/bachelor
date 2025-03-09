@@ -51,6 +51,7 @@ message DecisionMessage {
 message P1aMessage {
   string scout_id = 1;
   BallotNumber ballot_number = 2;
+  int64 last_applied_slot = 3;
 }
 
 message P1bMessage {

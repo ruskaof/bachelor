@@ -19,6 +19,7 @@ import org.apache.ratis.util.LifeCycle;
 import ru.itmo.rusinov.consensus.kv.store.paxos.KvStorePaxosStateMachine;
 import ru.itmo.rusinov.consensus.kv.store.ratis.KvStateMachine;
 import ru.itmo.rusinov.consensus.kv.store.db.MapDbKvDatabase;
+import ru.itmo.rusinov.consensus.paxos.core.MapDBDurableStateStore;
 import ru.itmo.rusinov.consensus.paxos.core.PaxosServer;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.TCPSocketEnvironment;
@@ -105,7 +106,7 @@ public class KvStoreApplication {
         var stateMachine = new KvStorePaxosStateMachine(new MapDbKvDatabase());
 
         var server = new PaxosServer(
-                id, stateMachine, new TCPSocketEnvironment(port, destinations), config, new File(storagePath)
+                id, stateMachine, new TCPSocketEnvironment(port, destinations), config, new File(storagePath), new MapDBDurableStateStore()
         );
 
         server.start();

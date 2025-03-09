@@ -24,8 +24,9 @@ public class Leader {
     private final Config config;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final DurableStateStore durableStateStore;
 
-    public Leader(String id, Environment environment, Config config) {
+    public Leader(String id, Environment environment, Config config, DurableStateStore durableStateStore) {
         this.id = id;
         this.environment = environment;
         this.config = config;
@@ -33,11 +34,12 @@ public class Leader {
                 .setLeaderId(id)
                 .setRound(0)
                 .build();
+        this.durableStateStore = durableStateStore;
     }
 
     public void run() {
         log.info("Starting leader {}", id);
-        executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
+        executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L)));
         while (true) {
             handleMessage(this.environment.getNextLeaderMessage());
         }
@@ -49,7 +51,11 @@ public class Leader {
         switch (message.getMessageCase()) {
             case PROPOSE -> {
                 var pm = message.getPropose();
-                this.proposals.putIfAbsent(pm.getSlotNumber(), pm.getCommand());
+                if (this.proposals.containsKey(pm.getSlotNumber())) {
+                    return;
+                }
+
+                this.proposals.put(pm.getSlotNumber(), pm.getCommand());
                 if (this.active) {
                     executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.getCommand(), pm.getSlotNumber()));
                 }
@@ -70,6 +76,7 @@ public class Leader {
                     }
 
                 }
+                collectGarbage();
                 this.proposals.forEach((sn, c) ->
                         executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, c, sn)));
                 this.active = true;
@@ -81,7 +88,7 @@ public class Leader {
                             .setRound(pm.getBallotNumber().getRound() + 1)
                             .setLeaderId(this.id)
                             .build();
-                    executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber));
+                    executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L)));
                     this.active = false;
                 } else {
                     log.info("Preempted is ignored because ({}, {}) less than ({}, {})", pm.getBallotNumber().getRound(), pm.getBallotNumber().getLeaderId(), ballotNumber.getRound(), ballotNumber.getLeaderId());
@@ -90,5 +97,12 @@ public class Leader {
 
             default -> log.error("Unknown message: {}", message);
         }
+    }
+
+    private void collectGarbage() {
+        var minApplied = durableStateStore.loadLastAppliedSlot();
+        if (minApplied.isEmpty()) return;
+
+        proposals.entrySet().removeIf((e) -> e.getKey() <= minApplied.get());
     }
 }

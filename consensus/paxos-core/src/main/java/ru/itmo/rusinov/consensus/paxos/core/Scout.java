@@ -17,13 +17,15 @@ public class Scout implements Runnable {
     private final Environment environment;
     private final Config config;
     private final BallotNumber ballotNumber;
+    private final long lastAppliedSlot;
 
-    public Scout(String replicaId, UUID id, Environment environment, Config config, BallotNumber ballotNumber) {
+    public Scout(String replicaId, UUID id, Environment environment, Config config, BallotNumber ballotNumber, long lastAppliedSlot) {
         this.replicaId = replicaId;
         this.id = id;
         this.environment = environment;
         this.config = config;
         this.ballotNumber = ballotNumber;
+        this.lastAppliedSlot = lastAppliedSlot;
     }
 
     @Override
@@ -35,7 +37,8 @@ public class Scout implements Runnable {
         for (String r : config.replicas()) {
             var p1a = P1aMessage.newBuilder()
                     .setScoutId(id.toString())
-                    .setBallotNumber(ballotNumber);
+                    .setBallotNumber(ballotNumber)
+                    .setLastAppliedSlot(lastAppliedSlot);
             var p1aMessage = PaxosMessage.newBuilder()
                     .setSrc(this.replicaId)
                     .setP1A(p1a)

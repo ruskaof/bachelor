@@ -14,21 +14,27 @@ public class PaxosServer {
     private final Replica replica;
     private final Leader leader;
     private final StateMachine stateMachine;
-    private final File stateMachineDir;
+    private final File storagePath;
+    private final DurableStateStore durableStateStore;
 
-    public PaxosServer(String id, StateMachine stateMachine, Environment environment, Config config, File stateMachineDir) {
+    public PaxosServer(String id, StateMachine stateMachine, Environment environment, Config config, File storagePath, DurableStateStore durableStateStore) {
         this.id = id;
         this.stateMachine = stateMachine;
-        this.stateMachineDir = stateMachineDir;
-        this.acceptor = new Acceptor(environment, id);
-        this.replica = new Replica(environment, stateMachine, id, config);
-        this.leader = new Leader(id, environment, config);
+        this.storagePath = storagePath;
+
+        stateMachine.initialize(storagePath);
+        durableStateStore.initialize(storagePath);
+
+        this.acceptor = new Acceptor(environment, config, durableStateStore, id);
+        this.replica = new Replica(environment, stateMachine, id, config, durableStateStore);
+        this.leader = new Leader(id, environment, config, durableStateStore);
+        this.durableStateStore = durableStateStore;
     }
 
     public void start() {
         log.info("Starting paxos server with id {}", id);
 
-        stateMachine.initialize(stateMachineDir);
+
 
         new Thread(acceptor::run, "AcceptorThread").start();
         new Thread(replica::run, "ReplicaThread").start();

@@ -7,6 +7,8 @@ services:
       - "8080:8080"
     networks:
       - backend
+    environment:
+      CLIENT_CONSENSUS_PROTOCOL: paxos
 
 #  k6:
 #    image: grafana/k6

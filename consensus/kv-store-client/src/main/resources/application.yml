@@ -7,3 +7,5 @@ servers:
       address: kv-peer-2:8082
     - id: 3
       address: kv-peer-3:8083
+consensus:
+  protocol: ${CLIENT_CONSENSUS_PROTOCOL:paxos}
