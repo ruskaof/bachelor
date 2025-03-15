@@ -16,8 +16,6 @@ import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
-import ru.itmo.rusinov.consensus.common.NettyDistributedServer;
-import ru.itmo.rusinov.consensus.common.NettyEnvironmentClient;
 import ru.itmo.rusinov.consensus.common.SimpleDistributedServer;
 import ru.itmo.rusinov.consensus.common.SimpleEnvironmentClient;
 import ru.itmo.rusinov.consensus.kv.store.paxos.KvStorePaxosStateMachine;
