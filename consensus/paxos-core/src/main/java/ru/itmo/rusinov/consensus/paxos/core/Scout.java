@@ -49,7 +49,8 @@ public class Scout implements Runnable {
 
         var pvalues = new HashSet<Pvalue>();
         while (true) {
-            var msg = environment.getNextScoutMessage(id);
+            var request = environment.getNextScoutMessage(id);
+            var msg = request.message();
             log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
 
             if (!msg.getMessageCase().equals(PaxosMessage.MessageCase.P1B)) {

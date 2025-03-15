@@ -49,7 +49,8 @@ public class Commander implements Runnable {
         }
 
         while (true) {
-            var msg = environment.getNextCommanderMessage(id);
+            var request = environment.getNextCommanderMessage(id);
+            var msg = request.message();
             log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
 
             if (msg.getMessageCase() != PaxosMessage.MessageCase.P2B) {

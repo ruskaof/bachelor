@@ -1,0 +1,130 @@
+package ru.itmo.rusinov.consensus.paxos.core.environment;
+
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import paxos.Paxos;
+import ru.itmo.rusinov.consensus.common.DistributedServer;
+import ru.itmo.rusinov.consensus.common.EnvironmentClient;
+
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.*;
+
+@Slf4j
+public class DefaultPaxosEnvironment implements Environment {
+    private final DistributedServer distributedServer;
+    private final EnvironmentClient environmentClient;
+
+    private final ConcurrentHashMap<UUID, CompletableFuture<byte[]>> requests = new ConcurrentHashMap<>();
+
+    private final BlockingQueue<PaxosRequest> acceptorQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<PaxosRequest> replicaQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<PaxosRequest> leaderQueue = new LinkedBlockingQueue<>();
+
+    private final ConcurrentHashMap<String, LinkedBlockingQueue<PaxosRequest>> commanderQueues =
+            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, LinkedBlockingQueue<PaxosRequest>> scoutQueues =
+            new ConcurrentHashMap<>();
+
+    public DefaultPaxosEnvironment(DistributedServer distributedServer, EnvironmentClient environmentClient) {
+        this.distributedServer = distributedServer;
+        this.environmentClient = environmentClient;
+    }
+
+    @Override
+    public CompletableFuture<byte[]> sendMessage(String destination, Paxos.PaxosMessage paxosMessage) {
+        return environmentClient.sendMessage(paxosMessage.toByteArray(), destination);
+    }
+
+    @Override
+    public void sendResponse(UUID requestId, byte[] response) {
+        var result = Optional.ofNullable(response).orElse(new byte[0]);
+
+        requests.get(requestId).complete(result);
+//        Optional.ofNullable(requests.get(requestId))
+//                .map((r) -> r.complete(result));
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosRequest getNextAcceptorMessage() {
+        var request = acceptorQueue.take();
+         sendResponse(request.requestId(), new byte[0]);
+        return request;
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosRequest getNextLeaderMessage() {
+        var request = leaderQueue.take();
+        sendResponse(request.requestId(), new byte[0]);
+        return request;
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosRequest getNextScoutMessage(UUID scoutId) {
+        scoutQueues.putIfAbsent(scoutId.toString(), new LinkedBlockingQueue<>());
+        var request = scoutQueues.get(scoutId.toString()).take();
+        sendResponse(request.requestId(), new byte[0]);
+        return request;
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosRequest getNextCommanderMessage(UUID commanderId) {
+        commanderQueues.putIfAbsent(commanderId.toString(), new LinkedBlockingQueue<>());
+        var request = commanderQueues.get(commanderId.toString()).take();
+        sendResponse(request.requestId(), new byte[0]);
+        return request;
+    }
+
+    @SneakyThrows
+    @Override
+    public PaxosRequest getNextReplicaMessage() {
+        return replicaQueue.take();
+    }
+
+    @Override
+    public void init() {
+        distributedServer.setRequestHandler(this::handleMessage);
+        distributedServer.initialize();
+        environmentClient.initialize();
+    }
+
+    @Override
+    public void close() throws Exception {
+        distributedServer.close();
+    }
+
+    @SneakyThrows
+    private CompletableFuture<byte[]> handleMessage(byte[] bytes) {
+        var paxosMessage = Paxos.PaxosMessage.parseFrom(bytes);
+        var requestId = UUID.randomUUID();
+        var request = new PaxosRequest(requestId, paxosMessage);
+        putMessageToQueues(request);
+        var future = new CompletableFuture<byte[]>();
+        requests.put(requestId, future);
+        return future;
+    }
+
+    private void putMessageToQueues(PaxosRequest paxosRequest) throws InterruptedException {
+        switch (paxosRequest.message().getMessageCase()) {
+
+            case REQUEST, DECISION -> replicaQueue.put(paxosRequest);
+
+            case PROPOSE, ADOPTED, PREEMPTED -> leaderQueue.put(paxosRequest);
+
+            case P1B -> scoutQueues
+                    .computeIfAbsent(paxosRequest.message().getP1B().getScoutId(),
+                            (uuid -> new LinkedBlockingQueue<>())).put(paxosRequest);
+            case P2B -> commanderQueues
+                    .computeIfAbsent(paxosRequest.message().getP2B().getCommanderId(),
+                            (uuid -> new LinkedBlockingQueue<>())).put(paxosRequest);
+
+            case P1A, P2A -> acceptorQueue.put(paxosRequest);
+
+            default -> throw new IllegalStateException("Unexpected value: " + paxosRequest);
+        }
+    }
+}

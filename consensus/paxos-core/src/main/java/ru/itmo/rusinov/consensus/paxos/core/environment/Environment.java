@@ -5,15 +5,17 @@ import paxos.Paxos;
 import paxos.Paxos.PaxosMessage;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
-public interface Environment {
+public interface Environment extends AutoCloseable {
+    void init();
 
-    void sendMessage(String destination, PaxosMessage paxosMessage);
-    void sendResponse(String clientId, Paxos.CommandResult response);
+    CompletableFuture<byte[]> sendMessage(String destination, PaxosMessage paxosMessage);
+    void sendResponse(UUID requestId, byte[] response);
 
-    PaxosMessage getNextAcceptorMessage();
-    PaxosMessage getNextLeaderMessage();
-    PaxosMessage getNextScoutMessage(UUID scoutId);
-    PaxosMessage getNextCommanderMessage(UUID commanderId);
-    PaxosMessage getNextReplicaMessage();
+    PaxosRequest getNextAcceptorMessage();
+    PaxosRequest getNextLeaderMessage();
+    PaxosRequest getNextScoutMessage(UUID scoutId);
+    PaxosRequest getNextCommanderMessage(UUID commanderId);
+    PaxosRequest getNextReplicaMessage();
 }

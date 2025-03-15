@@ -16,16 +16,19 @@ import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
+import ru.itmo.rusinov.consensus.common.NettyDistributedServer;
+import ru.itmo.rusinov.consensus.common.NettyEnvironmentClient;
+import ru.itmo.rusinov.consensus.common.SimpleDistributedServer;
+import ru.itmo.rusinov.consensus.common.SimpleEnvironmentClient;
 import ru.itmo.rusinov.consensus.kv.store.paxos.KvStorePaxosStateMachine;
 import ru.itmo.rusinov.consensus.kv.store.ratis.KvStateMachine;
 import ru.itmo.rusinov.consensus.kv.store.db.MapDbKvDatabase;
 import ru.itmo.rusinov.consensus.paxos.core.MapDBDurableStateStore;
 import ru.itmo.rusinov.consensus.paxos.core.PaxosServer;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
-import ru.itmo.rusinov.consensus.paxos.core.environment.TCPSocketEnvironment;
+import ru.itmo.rusinov.consensus.paxos.core.environment.DefaultPaxosEnvironment;
 
 import java.io.File;
-import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
@@ -98,7 +101,7 @@ public class KvStoreApplication {
                         (p) -> p.split(":")[0],
                         (p) -> {
                             var addressParts = p.split(":");
-                            return new InetSocketAddress(addressParts[1], Integer.parseInt(addressParts[2]));
+                            return addressParts[1] + ":" + addressParts[2];
                         }
                 ));
         var config = new Config(destinations.keySet());
@@ -106,7 +109,12 @@ public class KvStoreApplication {
         var stateMachine = new KvStorePaxosStateMachine(new MapDbKvDatabase());
 
         var server = new PaxosServer(
-                id, stateMachine, new TCPSocketEnvironment(port, destinations), config, new File(storagePath), new MapDBDurableStateStore()
+                id,
+                stateMachine,
+                new DefaultPaxosEnvironment(new SimpleDistributedServer(port), new SimpleEnvironmentClient(destinations)),
+                config,
+                new File(storagePath),
+                new MapDBDurableStateStore()
         );
 
         server.start();

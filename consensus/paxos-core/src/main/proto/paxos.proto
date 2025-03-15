@@ -13,9 +13,13 @@ message Pvalue {
   Command command = 3;
 }
 
+message ClientCommand {
+  bytes content = 1;
+}
+
 message Command {
   bytes content = 1;
-  string client_id = 2;
+  string request_id = 2;
 }
 
 message CommandResult {
@@ -83,5 +87,5 @@ message ProposeMessage {
 }
 
 message RequestMessage {
-  Command command = 1;
+  ClientCommand command = 1;
 }

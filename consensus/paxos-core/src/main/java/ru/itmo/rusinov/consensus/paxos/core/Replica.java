@@ -70,7 +70,8 @@ public class Replica {
         // todo for reconfig command
         var result = this.stateMachine.applyCommand(cmd);
         if (sendResponse) {
-            this.environment.sendResponse(cmd.getClientId(), result);
+            log.info("Sending response for {}", cmd.getRequestId());
+            this.environment.sendResponse(UUID.fromString(cmd.getRequestId()), result.toByteArray());
         }
         this.slotOut++;
 
@@ -80,15 +81,21 @@ public class Replica {
     public void run() {
         log.info("Starting replica {}", id);
         while (true) {
-            var msg = environment.getNextReplicaMessage();
+            var request = environment.getNextReplicaMessage();
+            var msg = request.message();
             log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
 
             switch (msg.getMessageCase()) {
                 case REQUEST -> {
                     var rm = msg.getRequest();
-                    this.requests.add(rm.getCommand());
+                    var command = Paxos.Command.newBuilder()
+                            .setContent(rm.getCommand().getContent())
+                            .setRequestId(request.requestId().toString())
+                            .build();
+                    this.requests.add(command);
                 }
                 case DECISION -> {
+                    environment.sendResponse(request.requestId(), new byte[0]);
                     var dm = msg.getDecision();
                     this.decisions.put(dm.getSlotNumber(), dm.getCommand());
                     while (this.decisions.containsKey(this.slotOut)) {

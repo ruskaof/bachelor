@@ -1,101 +1,70 @@
 package ru.itmo.rusinov.consensus.kv.store.client.paxos;
 
 import com.google.protobuf.ByteString;
-import lombok.SneakyThrows;
+import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
 import reactor.core.publisher.Mono;
 import ru.itmo.rusinov.Message;
+import ru.itmo.rusinov.consensus.common.EnvironmentClient;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class PaxosClient {
-    private final Map<String, InetSocketAddress> replicas;
-    private final Map<String, Socket> streams = new ConcurrentHashMap<>();
     private final List<String> replicaIds;
-    private final AtomicInteger roundRobinIndex = new AtomicInteger(0);
+    private final EnvironmentClient environmentClient;
+    private final AtomicInteger replicaIndex = new AtomicInteger(0);
 
-    public PaxosClient(Map<String, InetSocketAddress> replicas) {
-        this.replicas = replicas;
-        this.replicaIds = List.copyOf(replicas.keySet());
+    public PaxosClient(List<String> replicaIds, EnvironmentClient environmentClient) {
+        this.replicaIds = replicaIds;
+        this.environmentClient = environmentClient;
     }
 
-    @SneakyThrows
-    private synchronized Socket getOrCreateConnection(String replicaId) {
-        Socket socket = streams.get(replicaId);
-        if (socket != null && !socket.isClosed()) {
-            return socket;
-        }
-
-        for (int attempt = 0; attempt < 3; attempt++) {
-            try {
-                socket = new Socket();
-                socket.connect(replicas.get(replicaId), 1000);
-                streams.put(replicaId, socket);
-                log.info("Connected to replica {}", replicaId);
-                return socket;
-            } catch (IOException e) {
-                log.error("Connection attempt {} to {} failed: {}", attempt, replicaId, e.getMessage());
-                Thread.sleep(1000);
-            }
-        }
-        streams.remove(replicaId);
-        return null;
+    private String selectReplica() {
+        int index = replicaIndex.getAndUpdate(i -> (i + 1) % replicaIds.size());
+        return replicaIds.get(index);
     }
 
-    @SneakyThrows
-    private Paxos.CommandResult sendCommandToReplica(String replicaId, Paxos.Command paxosCommand) {
-        Socket socket = getOrCreateConnection(replicaId);
-        if (socket == null) {
-            log.error("Failed to connect to replica {}", replicaId);
-            return null;
-        }
-        try {
-            Paxos.RequestMessage request = Paxos.RequestMessage.newBuilder()
-                    .setCommand(paxosCommand)
-                    .build();
-            Paxos.PaxosMessage requestMessage = Paxos.PaxosMessage.newBuilder()
-                    .setRequest(request)
-                    .build();
-            requestMessage.writeDelimitedTo(socket.getOutputStream());
-            log.info("Sent command to replica {}", replicaId);
-            return Paxos.CommandResult.parseDelimitedFrom(socket.getInputStream());
-        } catch (IOException e) {
-            log.error("Failed to send command to replica {}: {}", replicaId, e.getMessage());
-            streams.get(replicaId).close();
-            streams.remove(replicaId);
-            return null;
-        }
+    private CompletableFuture<Paxos.CommandResult> sendCommand(Paxos.ClientCommand paxosCommand) {
+        return sendCommandToReplica(paxosCommand, 0);
     }
 
-    public synchronized Paxos.CommandResult sendCommand(Paxos.Command paxosCommand) {
-        if (replicaIds.isEmpty()) {
-            log.error("No replicas available to send command");
-            return null;
+    private CompletableFuture<Paxos.CommandResult> sendCommandToReplica(Paxos.ClientCommand paxosCommand, int attempt) {
+        if (attempt >= replicaIds.size()) {
+            return CompletableFuture.failedFuture(new RuntimeException("All replicas failed"));
         }
 
-        for (int i = 0; i < replicaIds.size(); i++) {
-            int index = roundRobinIndex.getAndUpdate(n -> (n + 1) % replicaIds.size());
-            String selectedReplica = replicaIds.get(index);
-            Paxos.CommandResult result = sendCommandToReplica(selectedReplica, paxosCommand);
-            if (result != null) {
-                return result;
-            }
-        }
-        log.error("All replicas are unavailable");
-        return null;
+        String replica = selectReplica();
+        log.info("Sending request to replica: {}", replica);
+
+        var message = Paxos.PaxosMessage.newBuilder()
+                .setRequest(
+                        Paxos.RequestMessage.newBuilder()
+                                .setCommand(paxosCommand)
+                                .build()
+                )
+                .build();
+
+        return environmentClient.sendMessage(message.toByteArray(), replica)
+                .exceptionally(ex -> {
+                    log.error("Exception while contacting replica {}: {}", replica, ex.getMessage());
+                    return sendCommandToReplica(paxosCommand, attempt + 1).join().toByteArray();
+                })
+                .thenApply((b) -> {
+                    try {
+                        return Paxos.CommandResult.parseFrom(b);
+                    } catch (InvalidProtocolBufferException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 
     public Mono<Void> setStringValue(String key, String value) {
-        Paxos.Command command = Paxos.Command.newBuilder()
+        Paxos.ClientCommand command = Paxos.ClientCommand.newBuilder()
                 .setContent(Message.KvStoreProtoMessage.newBuilder()
                         .setSet(Message.SetMessage.newBuilder()
                                 .setKey(ByteString.copyFromUtf8(key))
@@ -105,17 +74,11 @@ public class PaxosClient {
                         .toByteString())
                 .build();
 
-        return Mono.fromCallable(() -> {
-            if (sendCommand(command) == null) {
-                throw new RuntimeException("Failed to set value in Paxos");
-            }
-            return null;
-        }).then();
+        return Mono.fromFuture(sendCommand(command)).then();
     }
 
     public Mono<String> getStringValue(String key) {
-        Paxos.Command command = Paxos.Command.newBuilder()
-                .setClientId(UUID.randomUUID().toString())
+        Paxos.ClientCommand command = Paxos.ClientCommand.newBuilder()
                 .setContent(Message.KvStoreProtoMessage.newBuilder()
                         .setGet(Message.GetMessage.newBuilder()
                                 .setKey(ByteString.copyFromUtf8(key))
@@ -124,12 +87,6 @@ public class PaxosClient {
                         .toByteString())
                 .build();
 
-        return Mono.fromCallable(() -> {
-            Paxos.CommandResult result = sendCommand(command);
-            if (result == null) {
-                throw new RuntimeException("Failed to get value from Paxos");
-            }
-            return result.getContent().toStringUtf8();
-        });
+        return Mono.fromFuture(sendCommand(command).thenApply(f -> f.getContent().toStringUtf8()));
     }
 }

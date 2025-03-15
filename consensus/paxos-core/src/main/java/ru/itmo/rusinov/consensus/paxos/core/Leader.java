@@ -10,6 +10,7 @@ import paxos.Paxos;
 import paxos.Paxos.BallotNumber;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
+import ru.itmo.rusinov.consensus.paxos.core.environment.PaxosRequest;
 
 @Slf4j
 public class Leader {
@@ -45,7 +46,8 @@ public class Leader {
         }
     }
 
-    private void handleMessage(Paxos.PaxosMessage message) {
+    private void handleMessage(PaxosRequest request) {
+        var message = request.message();
         log.info("Handling message {} from {}", message.getMessageCase(), message.getSrc());
 
         switch (message.getMessageCase()) {

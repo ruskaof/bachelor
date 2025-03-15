@@ -13,6 +13,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import ru.itmo.rusinov.consensus.common.NettyEnvironmentClient;
+import ru.itmo.rusinov.consensus.common.SimpleEnvironmentClient;
 import ru.itmo.rusinov.consensus.kv.store.client.paxos.PaxosClient;
 
 import java.net.InetSocketAddress;
@@ -34,9 +36,16 @@ public class ClientsConfiguration {
 
     @Bean
     public PaxosClient paxosClient(PeerConfigurationProperties peerConfigurationProperties) {
-        return new PaxosClient(peerConfigurationProperties.peers().stream().collect(Collectors.toMap(PeerConfigurationProperties.PeerConfiguration::id, (p) -> {
-            var parts = p.address().split(":");
-            return new InetSocketAddress(parts[0], Integer.parseInt(parts[1]));
-        })));
+        var destinations = peerConfigurationProperties.peers()
+                .stream()
+                .collect(Collectors.toMap(
+                        PeerConfigurationProperties.PeerConfiguration::id,
+                        PeerConfigurationProperties.PeerConfiguration::address
+                ));
+
+        var envClient = new SimpleEnvironmentClient(destinations);
+        envClient.initialize();
+
+        return new PaxosClient(destinations.keySet().stream().toList(), envClient);
     }
 }

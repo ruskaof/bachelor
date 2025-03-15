@@ -6,4 +6,5 @@ include 'paxos-core'
 include 'kv-store-paxos'
 include 'kv-store-paxos-api'
 include 'paxos-test'
+include 'consensus-common'
 

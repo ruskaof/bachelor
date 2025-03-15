@@ -16,11 +16,13 @@ public class PaxosServer {
     private final StateMachine stateMachine;
     private final File storagePath;
     private final DurableStateStore durableStateStore;
+    private final Environment environment;
 
     public PaxosServer(String id, StateMachine stateMachine, Environment environment, Config config, File storagePath, DurableStateStore durableStateStore) {
         this.id = id;
         this.stateMachine = stateMachine;
         this.storagePath = storagePath;
+        this.environment = environment;
 
         stateMachine.initialize(storagePath);
         durableStateStore.initialize(storagePath);
@@ -34,7 +36,7 @@ public class PaxosServer {
     public void start() {
         log.info("Starting paxos server with id {}", id);
 
-
+        environment.init();
 
         new Thread(acceptor::run, "AcceptorThread").start();
         new Thread(replica::run, "ReplicaThread").start();

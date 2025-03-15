@@ -18,6 +18,7 @@ jar {
 
 dependencies {
     implementation(project(':paxos-core'))
+    implementation(project(':consensus-common'))
     implementation 'com.google.protobuf:protobuf-java:4.29.3'
 
 

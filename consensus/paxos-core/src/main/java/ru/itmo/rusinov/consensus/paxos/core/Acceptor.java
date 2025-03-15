@@ -6,9 +6,9 @@ import paxos.Paxos.BallotNumber;
 import paxos.Paxos.Pvalue;
 import ru.itmo.rusinov.consensus.paxos.core.config.Config;
 import ru.itmo.rusinov.consensus.paxos.core.environment.Environment;
+import ru.itmo.rusinov.consensus.paxos.core.environment.PaxosRequest;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class Acceptor {
@@ -37,17 +37,18 @@ public class Acceptor {
     public void run() {
         log.info("Starting acceptor {}", id);
         while (true) {
-            var msg = environment.getNextAcceptorMessage();
-            log.info("Handling message {} from {}", msg.getMessageCase(), msg.getSrc());
-            switch (msg.getMessageCase()) {
-                case P1A -> handleP1a(msg);
-                case P2A -> handleP2a(msg);
-                default -> log.error("Unexpected message: {}", msg);
+            var request = environment.getNextAcceptorMessage();
+            log.info("Handling message {} from {}", request.message().getMessageCase(), request.message().getSrc());
+            switch (request.message().getMessageCase()) {
+                case P1A -> handleP1a(request);
+                case P2A -> handleP2a(request);
+                default -> log.error("Unexpected message: {}", request.message());
             }
         }
     }
 
-    private void handleP2a(Paxos.PaxosMessage msg) {
+    private void handleP2a(PaxosRequest request) {
+        var msg = request.message();
         var p2a = msg.getP2A();
         if (ballotNumberComparator.compare(ballotNumber, p2a.getBallotNumber()) <= 0) {
             ballotNumber = p2a.getBallotNumber();  // Adopt the new ballot number
@@ -82,7 +83,8 @@ public class Acceptor {
         environment.sendMessage(msg.getSrc(), p2bMessage);
     }
 
-    private void handleP1a(Paxos.PaxosMessage msg) {
+    private void handleP1a(PaxosRequest request) {
+        var msg = request.message();
         var p1a = msg.getP1A();
         if (ballotNumberComparator.compare(p1a.getBallotNumber(), this.ballotNumber) > 0) {
             this.ballotNumber = p1a.getBallotNumber();
