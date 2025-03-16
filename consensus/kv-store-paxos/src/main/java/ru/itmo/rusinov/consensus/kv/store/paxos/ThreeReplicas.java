@@ -1,8 +1,6 @@
 package ru.itmo.rusinov.consensus.kv.store.paxos;
 
 import lombok.SneakyThrows;
-import ru.itmo.rusinov.consensus.common.NettyDistributedServer;
-import ru.itmo.rusinov.consensus.common.NettyEnvironmentClient;
 import ru.itmo.rusinov.consensus.common.SimpleDistributedServer;
 import ru.itmo.rusinov.consensus.common.SimpleEnvironmentClient;
 import ru.itmo.rusinov.consensus.paxos.core.MapDBDurableStateStore;

@@ -19,6 +19,7 @@ import org.apache.ratis.util.LifeCycle;
 import ru.itmo.rusinov.consensus.common.SimpleDistributedServer;
 import ru.itmo.rusinov.consensus.common.SimpleEnvironmentClient;
 import ru.itmo.rusinov.consensus.kv.store.paxos.KvStorePaxosStateMachine;
+import ru.itmo.rusinov.consensus.kv.store.raft.KvStoreRaftStateMachine;
 import ru.itmo.rusinov.consensus.kv.store.ratis.KvStateMachine;
 import ru.itmo.rusinov.consensus.kv.store.db.MapDbKvDatabase;
 import ru.itmo.rusinov.consensus.paxos.core.MapDBDurableStateStore;
@@ -127,8 +128,42 @@ public class KvStoreApplication {
 
         if (protocol.equals("paxos")) {
             runOnPaxos();
-        } else {
+        } else if (protocol.equals("ratis")) {
             runOnRatis();
+        } else {
+            runOnRaft();
+        }
+    }
+
+    @SneakyThrows
+    private static void runOnRaft() {
+        String id = System.getenv("RATIS_KV_PEER_ID");
+        int port = Integer.parseInt(System.getenv("RATIS_KV_PORT"));
+        var destinations = Arrays.stream(System.getenv("RATIS_KV_PEERS").split(","))
+                .collect(Collectors.toMap(
+                        (p) -> p.split(":")[0],
+                        (p) -> {
+                            var addressParts = p.split(":");
+                            return addressParts[1] + ":" + addressParts[2];
+                        }
+                ));
+        String storagePath = System.getenv("RATIS_KV_STORAGE_PATH");
+        var stateMachine = new KvStoreRaftStateMachine(new MapDbKvDatabase());
+
+        var server = new ru.itmo.rusinov.consensus.raft.core.RaftServer(
+                new ru.itmo.rusinov.consensus.raft.core.MapDBDurableStateStore(),
+                id,
+                destinations.keySet(),
+                new SimpleEnvironmentClient(destinations),
+                new SimpleDistributedServer(port),
+                stateMachine,
+                new File(storagePath)
+        );
+
+        server.start();
+
+        while (true) {
+            Thread.sleep(1000);
         }
     }
 }

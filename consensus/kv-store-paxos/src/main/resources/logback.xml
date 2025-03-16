@@ -7,7 +7,7 @@
 
     <appender name="STDOUT" class="ConsoleAppender">
         <encoder class="PatternLayoutEncoder">
-            <pattern>[%thread] %highlight(%-5level) %cyan(%logger{15}) -%kvp -%msg %n</pattern>
+            <pattern>%d [%thread] %highlight(%-5level) %cyan(%logger{15}) -%kvp -%msg %n</pattern>
         </encoder>
     </appender>
 

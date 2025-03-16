@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package raft;
+
+message LogEntry {
+  RaftCommand command = 1;
+  int64 term = 2;
+}
+
+message RaftCommand {
+  bytes value = 1;
+}
+
+message RaftCommandResult {
+  bytes value = 1;
+}
+
+message AppendEntriesRPC {
+  string leader_id = 1;
+  optional int64 prev_log_index = 2;
+  optional int64 prev_log_term = 3;
+  repeated LogEntry entries = 4;
+  int64 leader_commit = 5;
+}
+
+message AppendEntriesRPCResult {
+  bool success = 1;
+}
+
+message RequestVoteRPC {
+  string candidate_id = 1;
+  int64 last_log_index = 2;
+  int64 last_log_term = 3;
+}
+
+message RequestVoteRPCResult {
+  bool vote_granted = 1;
+}
+
+message HeartBeat {
+
+}
+
+message ElectionTimeoutElapsed {
+
+}
+
+message ClientRequest {
+  RaftCommand request = 1;
+}
+
+message InternalClientRequest {
+  ClientRequest client_request = 1;
+  string request_id = 2;
+}
+
+message ClientResponse {
+  RaftCommandResult command_result = 1;
+  string suggested_leader = 2;
+}
+
+message RaftServerRequest {
+  oneof message {
+    ClientRequest client_request = 1;
+    RaftMessage raft_message = 2;
+  }
+}
+
+message RaftMessage {
+  string src = 1;
+  int64 term = 2;
+
+  oneof message {
+    AppendEntriesRPC append_entries = 3;
+    AppendEntriesRPCResult append_entries_result = 4;
+    RequestVoteRPC request_vote = 5;
+    RequestVoteRPCResult request_vote_result = 6;
+    HeartBeat heartbeat = 7;
+    ElectionTimeoutElapsed election_timeout_elapsed = 8;
+    InternalClientRequest client_request = 9;
+  }
+}

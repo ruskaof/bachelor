@@ -4,12 +4,10 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
-import reactor.core.publisher.Mono;
 import ru.itmo.rusinov.Message;
 import ru.itmo.rusinov.consensus.common.EnvironmentClient;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -29,13 +27,13 @@ public class PaxosClient {
         return replicaIds.get(index);
     }
 
-    private CompletableFuture<Paxos.CommandResult> sendCommand(Paxos.ClientCommand paxosCommand) {
+    private Paxos.CommandResult sendCommand(Paxos.ClientCommand paxosCommand) {
         return sendCommandToReplica(paxosCommand, 0);
     }
 
-    private CompletableFuture<Paxos.CommandResult> sendCommandToReplica(Paxos.ClientCommand paxosCommand, int attempt) {
+    private Paxos.CommandResult sendCommandToReplica(Paxos.ClientCommand paxosCommand, int attempt) {
         if (attempt >= replicaIds.size()) {
-            return CompletableFuture.failedFuture(new RuntimeException("All replicas failed"));
+            throw new RuntimeException("All replicas failed");
         }
 
         String replica = selectReplica();
@@ -49,21 +47,18 @@ public class PaxosClient {
                 )
                 .build();
 
-        return environmentClient.sendMessage(message.toByteArray(), replica)
-                .exceptionally(ex -> {
-                    log.error("Exception while contacting replica {}: {}", replica, ex.getMessage());
-                    return sendCommandToReplica(paxosCommand, attempt + 1).join().toByteArray();
-                })
-                .thenApply((b) -> {
-                    try {
-                        return Paxos.CommandResult.parseFrom(b);
-                    } catch (InvalidProtocolBufferException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+        try {
+            byte[] response = environmentClient.sendMessage(message.toByteArray(), replica).get();
+            return Paxos.CommandResult.parseFrom(response);
+        } catch (InvalidProtocolBufferException e) {
+            throw new RuntimeException("Failed to parse response from replica", e);
+        } catch (Exception ex) {
+            log.error("Exception while contacting replica {}: {}", replica, ex.getMessage());
+            return sendCommandToReplica(paxosCommand, attempt + 1);
+        }
     }
 
-    public Mono<Void> setStringValue(String key, String value) {
+    public void setStringValue(String key, String value) {
         Paxos.ClientCommand command = Paxos.ClientCommand.newBuilder()
                 .setContent(Message.KvStoreProtoMessage.newBuilder()
                         .setSet(Message.SetMessage.newBuilder()
@@ -73,11 +68,10 @@ public class PaxosClient {
                         .build()
                         .toByteString())
                 .build();
-
-        return Mono.fromFuture(sendCommand(command)).then();
+        sendCommand(command);
     }
 
-    public Mono<String> getStringValue(String key) {
+    public String getStringValue(String key) {
         Paxos.ClientCommand command = Paxos.ClientCommand.newBuilder()
                 .setContent(Message.KvStoreProtoMessage.newBuilder()
                         .setGet(Message.GetMessage.newBuilder()
@@ -86,7 +80,6 @@ public class PaxosClient {
                         .build()
                         .toByteString())
                 .build();
-
-        return Mono.fromFuture(sendCommand(command).thenApply(f -> f.getContent().toStringUtf8()));
+        return sendCommand(command).getContent().toStringUtf8();
     }
 }

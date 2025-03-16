@@ -1,4 +1,4 @@
-package ru.itmo.rusinov.consensus.kv.store.client.paxos;
+package ru.itmo.rusinov.consensus.kv.store.client.raft;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -7,9 +7,9 @@ import ru.itmo.rusinov.consensus.kv.store.client.ConsensusClient;
 
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "consensus.protocol", havingValue = "paxos")
-public class KvStorePaxosClient implements ConsensusClient {
-    private final PaxosClient client;
+@ConditionalOnProperty(name = "consensus.protocol", havingValue = "raft")
+public class KvStoreRaftClient implements ConsensusClient {
+    private final RaftClient client;
 
     public void setStringValue(String key, String value) {
         client.setStringValue(key, value);
