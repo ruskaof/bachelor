@@ -23,8 +23,7 @@ public class RaftServer {
     private long currentTerm;
     private String votedFor;
     private final Map<Long, Raft.LogEntry> logEntries;
-    private TermIndex lastTermIndex;
-
+    private long lastIndex = 0;
     private long commitIndex = 0;
     private long lastApplied = 0;
 
@@ -67,9 +66,7 @@ public class RaftServer {
         this.stateMachine = stateMachine;
         this.storagePath = storagePath;
 
-        lastTermIndex = logEntries.entrySet().stream().max(Comparator.comparing(Map.Entry<Long, Raft.LogEntry>::getKey))
-                .map(e -> new TermIndex(e.getValue().getTerm(), e.getKey()))
-                .orElse(null);
+        lastIndex = logEntries.keySet().stream().max(Comparator.naturalOrder()).orElse(0L);
         currentRole = RaftRole.FOLLOWER;
     }
 
@@ -140,8 +137,8 @@ public class RaftServer {
                 .setTerm(currentTerm)
                 .setCommand(clientRequest.getClientRequest().getRequest())
                 .build();
-        var selectedIndex = Optional.ofNullable(lastTermIndex).map(ti -> ti.index()).orElse(1L);
-        lastTermIndex = new TermIndex(currentTerm, selectedIndex);
+        var selectedIndex = lastIndex + 1;
+        lastIndex = lastIndex + 1;
 
         inFlightClientRequests.put(selectedIndex, future);
         logEntries.put(selectedIndex, logEntry);
@@ -195,8 +192,8 @@ public class RaftServer {
         for (var e : appendEntries.getEntriesList()) {
             logEntries.put(entriesIndex, e);
             durableStateStore.addLog(entriesIndex, e);
-            lastTermIndex = new TermIndex(e.getTerm(), entriesIndex);
         }
+        lastIndex = entriesIndex;
 
         if (appendEntries.getLeaderCommit() > commitIndex) {
             commitIndex = Math.min(appendEntries.getLeaderCommit(), entriesIndex);
@@ -223,12 +220,13 @@ public class RaftServer {
         }
 
         if (Objects.nonNull(votedFor) && !votedFor.equals(requestVote.getCandidateId())) {
+            log.info("{} already voted for {}", id, votedFor);
             responseBuilder.getRequestVoteResultBuilder().setVoteGranted(false);
             sendRequestToOtherServer(responseBuilder.build(), raftMessage.getSrc());
             return;
         }
 
-
+        var lastTermIndex = lastIndex == 0 ? null : new TermIndex(logEntries.get(lastIndex).getTerm(), lastIndex);
         if (Objects.nonNull(lastTermIndex)
                 && lastTermIndex.compareTo(new TermIndex(requestVote.getLastLogTerm(), requestVote.getLastLogIndex())) > 0) {
             responseBuilder.getRequestVoteResultBuilder().setVoteGranted(false);
@@ -282,9 +280,14 @@ public class RaftServer {
                 .stream()
                 .max(Comparator.naturalOrder());
 
+        matchIndex.clear();
+        nextIndex.clear();
+
         for (var r : replicas) {
-            nextIndex.put(r, maxLogIndex.orElse(1L));
-            matchIndex.put(r, 0L);
+            if (!r.equals(id)) {
+                nextIndex.put(r, maxLogIndex.orElse(1L));
+                matchIndex.put(r, 0L);
+            }
         }
 
         currentRole = RaftRole.LEADER;
@@ -293,6 +296,7 @@ public class RaftServer {
     private void convertToFollower() {
         log.info("{} -> {}", id, RaftRole.FOLLOWER);
         electionTimer.resetTimer();
+        votedFor = null;
 
         currentRole = RaftRole.FOLLOWER;
     }
@@ -317,9 +321,9 @@ public class RaftServer {
 
         requestVoteMessageBuilder.getRequestVoteBuilder().setCandidateId(id);
 
-        if (Objects.nonNull(lastTermIndex)) {
-            requestVoteMessageBuilder.getRequestVoteBuilder().setLastLogIndex(lastTermIndex.index());
-            requestVoteMessageBuilder.getRequestVoteBuilder().setLastLogTerm(lastTermIndex.term());
+        if (lastIndex != 0) {
+            requestVoteMessageBuilder.getRequestVoteBuilder().setLastLogIndex(lastIndex);
+            requestVoteMessageBuilder.getRequestVoteBuilder().setLastLogTerm(logEntries.get(lastIndex).getTerm());
         }
 
         var message = requestVoteMessageBuilder.build();
@@ -366,8 +370,8 @@ public class RaftServer {
             if (r.equals(id) || awaitingReplicas.contains(r)) {
                 continue;
             }
-
-            if (Objects.isNull(lastTermIndex) || lastTermIndex.index() == matchIndex.get(r)) {
+            // fixme do not commit from prev terms
+            if (nextIndex.get(r) > lastIndex) {
                 continue;
             }
 
