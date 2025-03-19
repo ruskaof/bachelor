@@ -48,8 +48,7 @@ public class RaftServer {
     private final Map<UUID, CompletableFuture<Raft.ClientResponse>> awaitingClientRequests = new HashMap<>();
     private final Map<Long, CompletableFuture<Raft.ClientResponse>> inFlightClientRequests = new HashMap<>();
 
-    private Set<String> awaitingReplicas = new HashSet<>();
-
+    private Map<String, Long> maxSentLogs = new HashMap<>();
     private final File storagePath;
 
     public RaftServer(DurableStateStore durableStateStore, String id, Set<String> replicas, EnvironmentClient environmentClient, DistributedServer distributedServer, StateMachine stateMachine, File storagePath) {
@@ -114,7 +113,6 @@ public class RaftServer {
             return;
         }
 
-        awaitingReplicas.remove(raftMessage.getSrc());
         var appendEntriesResult = raftMessage.getAppendEntriesResult();
         if (!appendEntriesResult.getSuccess()) {
             nextIndex.compute(raftMessage.getSrc(), (k, prevNextIndex) -> prevNextIndex - 1);
@@ -122,6 +120,7 @@ public class RaftServer {
             matchIndex.put(raftMessage.getSrc(), nextIndex.get(raftMessage.getSrc()));
             nextIndex.compute(raftMessage.getSrc(), (k, prevNextIndex) -> prevNextIndex + 1);
         }
+        maxSentLogs.remove(raftMessage.getSrc());
     }
 
     private void handleClientRequest(Raft.RaftMessage raftMessage) {
@@ -292,6 +291,7 @@ public class RaftServer {
 
         matchIndex.clear();
         nextIndex.clear();
+        maxSentLogs.clear();
 
         for (var r : replicas) {
             if (!r.equals(id)) {
@@ -377,7 +377,7 @@ public class RaftServer {
         }
 
         for (var r : replicas) {
-            if (r.equals(id) || awaitingReplicas.contains(r)) {
+            if (r.equals(id) || maxSentLogs.getOrDefault(r, 0L) >= nextIndex.get(r)) {
                 continue;
             }
             // fixme do not commit from prev terms
@@ -401,7 +401,8 @@ public class RaftServer {
             message.getAppendEntriesBuilder().addEntries(logEntries.get(nextIndex.get(r)));
             message.getAppendEntriesBuilder().setLeaderCommit(commitIndex);
 
-            awaitingReplicas.add(r);
+            maxSentLogs.put(r, nextIndex.get(r));
+
             sendRequestToOtherServer(message.build(), r);
         }
     }
@@ -437,6 +438,7 @@ public class RaftServer {
             }
         }
 
+        log.info("Updating min commit with {}", minCommit);
         if (minCommit == 0 || logEntries.get(minCommit).getTerm() != currentTerm) {
             return;
         }
