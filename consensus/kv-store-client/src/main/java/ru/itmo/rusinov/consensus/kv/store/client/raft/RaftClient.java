@@ -28,18 +28,30 @@ public class RaftClient {
     public void setStringValue(String key, String value) {
         var leader = currentLeader.get();
 
-        var commandBuilder = Message.KvStoreProtoMessage.newBuilder();
-        commandBuilder.getSetBuilder().setValue(ByteString.copyFrom(value.getBytes()));
-        commandBuilder.getSetBuilder().setKey(ByteString.copyFrom(key.getBytes()));
+        var setMessage = Message.SetMessage.newBuilder()
+                .setKey(ByteString.copyFrom(key.getBytes()))
+                .setValue(ByteString.copyFrom(value.getBytes()))
+                .build();
+        var kvStoreMessage = Message.KvStoreProtoMessage.newBuilder()
+                .setSet(setMessage)
+                .build();
+        var raftCommand = Raft.RaftCommand.newBuilder()
+                .setValue(kvStoreMessage.toByteString())
+                .build();
+        var clientRequest = Raft.RaftServerRequest.newBuilder()
+                .setClientRequest(
+                        Raft.ClientRequest.newBuilder()
+                                .setRequest(raftCommand)
+                )
+                .build();
 
-        var messageBuilder = Raft.ClientRequest.newBuilder();
-        messageBuilder.getRequestBuilder().setValue(ByteString.copyFrom(commandBuilder.build().toByteArray()));
+        log.info("Sending set to raft replica {}", leader);
 
-
-        var responseBytes = environmentClient.sendMessage(messageBuilder.build().toByteArray(), leader).get();
+        var responseBytes = environmentClient.sendMessage(clientRequest.toByteArray(), leader).get();
         var response = Raft.ClientResponse.parseFrom(responseBytes);
 
         if (!response.getSuggestedLeader().isEmpty()) {
+            log.warn("{} not a leader. suggested leader: {}", leader, response.getSuggestedLeader());
             currentLeader.compareAndSet(leader, response.getSuggestedLeader());
             setStringValue(key, value);
         }
@@ -49,16 +61,29 @@ public class RaftClient {
     public String getStringValue(String key) {
         var leader = currentLeader.get();
 
-        var commandBuilder = Message.KvStoreProtoMessage.newBuilder();
-        commandBuilder.getGetBuilder().setKey(ByteString.copyFrom(key.getBytes()));
+        var getMessage = Message.GetMessage.newBuilder()
+                .setKey(ByteString.copyFrom(key.getBytes()))
+                .build();
+        var kvStoreMessage = Message.KvStoreProtoMessage.newBuilder()
+                .setGet(getMessage)
+                .build();
+        var raftCommand = Raft.RaftCommand.newBuilder()
+                .setValue(kvStoreMessage.toByteString())
+                .build();
+        var clientRequest = Raft.RaftServerRequest.newBuilder()
+                .setClientRequest(
+                        Raft.ClientRequest.newBuilder()
+                                .setRequest(raftCommand)
+                )
+                .build();
 
-        var messageBuilder = Raft.ClientRequest.newBuilder();
-        messageBuilder.getRequestBuilder().setValue(ByteString.copyFrom(commandBuilder.build().toByteArray()));
+        log.info("Sending get to raft replica {}", leader);
 
-        var responseBytes = environmentClient.sendMessage(messageBuilder.build().toByteArray(), leader).get();
+        var responseBytes = environmentClient.sendMessage(clientRequest.toByteArray(), leader).get();
         var response = Raft.ClientResponse.parseFrom(responseBytes);
 
         if (!response.getSuggestedLeader().isEmpty()) {
+            log.warn("{} not a leader. suggested leader: {}", leader, response.getSuggestedLeader());
             currentLeader.compareAndSet(leader, response.getSuggestedLeader());
             return getStringValue(key);
         }

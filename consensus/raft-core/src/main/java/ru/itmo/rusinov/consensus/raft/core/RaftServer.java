@@ -54,6 +54,7 @@ public class RaftServer {
 
     public RaftServer(DurableStateStore durableStateStore, String id, Set<String> replicas, EnvironmentClient environmentClient, DistributedServer distributedServer, StateMachine stateMachine, File storagePath) {
         durableStateStore.initialize(storagePath);
+        stateMachine.initialize(storagePath);
 
         this.durableStateStore = durableStateStore;
         currentTerm = durableStateStore.loadCurrentTerm().orElse(0L);
@@ -172,6 +173,7 @@ public class RaftServer {
                 .setTerm(currentTerm);
 
         if (raftMessage.getTerm() < currentTerm) {
+            log.info("Ignoring append entries because term is too old: {} < {}", raftMessage.getTerm(), currentTerm);
             responseBuilder.getAppendEntriesResultBuilder().setSuccess(false);
             sendRequestToOtherServer(responseBuilder.build(), raftMessage.getSrc());
             return;
@@ -182,6 +184,7 @@ public class RaftServer {
         if (prevLogCheck) {
             var prevLog = logEntries.get(appendEntries.getPrevLogIndex());
             if (Objects.isNull(prevLog) || prevLog.getTerm() != appendEntries.getPrevLogTerm()) {
+                log.info("Ignoring append entries because prev log by index {} term {} not found", appendEntries.getPrevLogIndex(), appendEntries.getPrevLogTerm());
                 responseBuilder.getAppendEntriesResultBuilder().setSuccess(false);
                 sendRequestToOtherServer(responseBuilder.build(), raftMessage.getSrc());
                 return;
