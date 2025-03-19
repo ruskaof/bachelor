@@ -15,7 +15,6 @@ public class RaftClient {
 
     private final List<String> replicaIds;
     private final EnvironmentClient environmentClient;
-
     private final AtomicReference<String> currentLeader;
 
     public RaftClient(List<String> replicaIds, EnvironmentClient environmentClient) {
@@ -25,9 +24,30 @@ public class RaftClient {
     }
 
     @SneakyThrows
-    public void setStringValue(String key, String value) {
-        var leader = currentLeader.get();
+    private byte[] sendRaftMessage(Raft.RaftServerRequest raftServerRequest) {
 
+        while (true) {
+            var leader = currentLeader.get();
+
+            try {
+
+                log.info("Sending set to raft replica {}", leader);
+                var responseBytes = environmentClient.sendMessage(raftServerRequest.toByteArray(), leader).get();
+                var response = Raft.ClientResponse.parseFrom(responseBytes);
+                if (!response.getSuggestedLeader().isEmpty()) {
+                    log.info("Suggested leader: {}", response.getSuggestedLeader());
+                    currentLeader.compareAndSet(leader, response.getSuggestedLeader());
+                } else {
+                    return response.getCommandResult().getValue().toByteArray();
+                }
+            } catch (Exception e) {
+                currentLeader.compareAndSet(leader, replicaIds.get((replicaIds.indexOf(leader) + 1) % replicaIds.size()));
+            }
+        }
+    }
+
+    @SneakyThrows
+    public void setStringValue(String key, String value) {
         var setMessage = Message.SetMessage.newBuilder()
                 .setKey(ByteString.copyFrom(key.getBytes()))
                 .setValue(ByteString.copyFrom(value.getBytes()))
@@ -45,22 +65,11 @@ public class RaftClient {
                 )
                 .build();
 
-        log.info("Sending set to raft replica {}", leader);
-
-        var responseBytes = environmentClient.sendMessage(clientRequest.toByteArray(), leader).get();
-        var response = Raft.ClientResponse.parseFrom(responseBytes);
-
-        if (!response.getSuggestedLeader().isEmpty()) {
-            log.warn("{} not a leader. suggested leader: {}", leader, response.getSuggestedLeader());
-            currentLeader.compareAndSet(leader, response.getSuggestedLeader());
-            setStringValue(key, value);
-        }
+        sendRaftMessage(clientRequest);
     }
 
     @SneakyThrows
     public String getStringValue(String key) {
-        var leader = currentLeader.get();
-
         var getMessage = Message.GetMessage.newBuilder()
                 .setKey(ByteString.copyFrom(key.getBytes()))
                 .build();
@@ -77,17 +86,6 @@ public class RaftClient {
                 )
                 .build();
 
-        log.info("Sending get to raft replica {}", leader);
-
-        var responseBytes = environmentClient.sendMessage(clientRequest.toByteArray(), leader).get();
-        var response = Raft.ClientResponse.parseFrom(responseBytes);
-
-        if (!response.getSuggestedLeader().isEmpty()) {
-            log.warn("{} not a leader. suggested leader: {}", leader, response.getSuggestedLeader());
-            currentLeader.compareAndSet(leader, response.getSuggestedLeader());
-            return getStringValue(key);
-        }
-
-        return response.getCommandResult().getValue().toStringUtf8();
+        return new String(sendRaftMessage(clientRequest));
     }
 }

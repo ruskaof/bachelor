@@ -103,6 +103,9 @@ public class RaftServer {
         electionTimer.resetTimer();
         if (raftMessage.getTerm() >= currentTerm) {
             votedFor = raftMessage.getSrc();
+            if (!currentRole.equals(RaftRole.FOLLOWER)) {
+                convertToFollower();
+            }
         }
     }
 
@@ -115,10 +118,10 @@ public class RaftServer {
         var appendEntriesResult = raftMessage.getAppendEntriesResult();
         if (!appendEntriesResult.getSuccess()) {
             nextIndex.compute(raftMessage.getSrc(), (k, prevNextIndex) -> prevNextIndex - 1);
+        } else {
+            matchIndex.put(raftMessage.getSrc(), nextIndex.get(raftMessage.getSrc()));
+            nextIndex.compute(raftMessage.getSrc(), (k, prevNextIndex) -> prevNextIndex + 1);
         }
-
-        matchIndex.put(raftMessage.getSrc(), nextIndex.get(raftMessage.getSrc()));
-        nextIndex.compute(raftMessage.getSrc(), (k, prevNextIndex) -> prevNextIndex + 1);
     }
 
     private void handleClientRequest(Raft.RaftMessage raftMessage) {
@@ -248,7 +251,7 @@ public class RaftServer {
 
     private void applyLogs() {
         while (commitIndex > lastApplied) {
-            log.info("Applying logs: commitIndex={}, lastApplied={}", commitIndex, lastApplied);
+            log.info("Applying logs: commitIndex={}, lastApplied={}, requests: {}", commitIndex, lastApplied, inFlightClientRequests);
             lastApplied++;
             var result = stateMachine.applyCommand(logEntries.get(lastApplied).getCommand().getValue().toByteArray());
 
@@ -256,6 +259,10 @@ public class RaftServer {
                 continue;
             }
             var request = inFlightClientRequests.remove(lastApplied);
+
+            if (Objects.isNull(request)) {
+                continue;
+            }
 
             var resultResponse = Raft.ClientResponse
                     .newBuilder()
@@ -423,19 +430,18 @@ public class RaftServer {
             return;
         }
 
-        var minCommit = matchIndex.values()
-                .stream()
-                .min(Comparator.naturalOrder());
+        var minCommit = commitIndex;
+        for (var v : matchIndex.values()) {
+            if (v > minCommit && matchIndex.values().stream().filter((it) -> it >= v).count() >= (replicas.size() / 2)) {
+                minCommit = v;
+            }
+        }
 
-        if (minCommit.isEmpty() || minCommit.get() == 0L) {
+        if (minCommit == 0 || logEntries.get(minCommit).getTerm() != currentTerm) {
             return;
         }
 
-        if (logEntries.get(minCommit.get()).getTerm() != currentTerm) {
-            return;
-        }
-
-        commitIndex = Math.max(commitIndex, minCommit.get());
+        commitIndex = Math.max(commitIndex, minCommit);
     }
 
     private class ElectionTimerChecker implements Runnable {
