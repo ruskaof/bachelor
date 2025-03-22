@@ -32,6 +32,7 @@ public class Commander implements Runnable {
 
     @Override
     public void run() {
+        log.info("Running commander with id {} for b{} s{}", id, ballotNumber, slotNumber);
         var waitFor = new HashSet<String>();
 
         for (String r : this.config.replicas()) {
@@ -87,5 +88,7 @@ public class Commander implements Runnable {
             }
 
         }
+
+        log.info("Commander with id {} for b{} s{} is done", id, ballotNumber, slotNumber);
     }
 }

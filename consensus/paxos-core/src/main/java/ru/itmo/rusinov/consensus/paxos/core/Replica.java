@@ -38,9 +38,6 @@ public class Replica {
 
     private void propose() {
         while (this.slotIn < this.slotOut + WINDOW && !this.requests.isEmpty()) {
-            if (this.slotIn > WINDOW && this.decisions.containsKey(this.slotIn - WINDOW)) {
-                // todo handle reconfig command if needed
-            }
             if (!decisions.containsKey(this.slotIn)) {
                 var cmd = this.requests.poll();
                 this.proposals.put(this.slotIn, cmd);
@@ -61,13 +58,12 @@ public class Replica {
     }
 
     private void perform(Command cmd, boolean sendResponse) {
-        for (long s = 0; s < this.slotOut; s++) {
-            if (this.decisions.get(s) == cmd) {
+        for (long s = 1; s < this.slotOut; s++) {
+            if (cmd.equals(this.decisions.get(s))) {
                 this.slotOut++;
                 return;
             }
         }
-        // todo for reconfig command
         var result = this.stateMachine.applyCommand(cmd);
         if (sendResponse) {
             log.info("Sending response for {}", cmd.getRequestId());
@@ -75,7 +71,9 @@ public class Replica {
         }
         this.slotOut++;
 
-        this.durableStateStore.saveLastAppliedSlot(this.slotIn);
+        if (slotOut > 1) {
+            this.durableStateStore.saveLastAppliedSlot(this.slotOut - 1);
+        }
     }
 
     public void run() {
@@ -97,6 +95,7 @@ public class Replica {
                 case DECISION -> {
                     environment.sendResponse(request.requestId(), new byte[0]);
                     var dm = msg.getDecision();
+                    log.info("Got decision for slot {}, slotOut={}, slotIn={}", dm.getSlotNumber(), slotOut, slotIn);
                     this.decisions.put(dm.getSlotNumber(), dm.getCommand());
                     while (this.decisions.containsKey(this.slotOut)) {
                         boolean sendResponse = false;
@@ -113,6 +112,11 @@ public class Replica {
                 }
             }
             this.propose();
+            logRequests();
         }
+    }
+
+    private void logRequests() {
+        log.info("Requests: {}. Proposals: {}", requests.stream().map(Command::getRequestId).toList(), proposals.keySet());
     }
 }

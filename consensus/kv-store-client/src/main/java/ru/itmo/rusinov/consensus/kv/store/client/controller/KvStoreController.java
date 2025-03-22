@@ -8,7 +8,7 @@ import ru.itmo.rusinov.consensus.kv.store.client.model.KvSetStringRequest;
 
 @RestController
 @RequiredArgsConstructor
-public class RatisHttpController {
+public class KvStoreController {
 
     private final ConsensusClient consensusClient;
 

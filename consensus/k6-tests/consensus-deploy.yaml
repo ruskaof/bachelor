@@ -8,7 +8,7 @@ services:
     networks:
       - backend
     environment:
-      CLIENT_CONSENSUS_PROTOCOL: raft
+      CLIENT_CONSENSUS_PROTOCOL: paxos
   
   kv-peer-1:
     build: ../kv-store
@@ -19,7 +19,7 @@ services:
     volumes:
       - kv-peer-1:/var/lib/kvstore/data
     environment:
-      KV_STORE_PROTOCOL: "raft"
+      KV_STORE_PROTOCOL: "paxos"
       RATIS_KV_PEER_ID: 1
       RATIS_KV_PORT: 8081
       RATIS_KV_PEERS: 1:localhost:8081,2:kv-peer-2:8082,3:kv-peer-3:8083
@@ -34,7 +34,7 @@ services:
     volumes:
       - kv-peer-2:/var/lib/kvstore/data
     environment:
-      KV_STORE_PROTOCOL: "raft"
+      KV_STORE_PROTOCOL: "paxos"
       RATIS_KV_PEER_ID: 2
       RATIS_KV_PORT: 8082
       RATIS_KV_PEERS: 1:kv-peer-1:8081,2:localhost:8082,3:kv-peer-3:8083
@@ -49,7 +49,7 @@ services:
     volumes:
       - kv-peer-3:/var/lib/kvstore/data
     environment:
-      KV_STORE_PROTOCOL: "raft"
+      KV_STORE_PROTOCOL: "paxos"
       RATIS_KV_PEER_ID: 3
       RATIS_KV_PORT: 8083
       RATIS_KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:localhost:8083

@@ -40,7 +40,7 @@ public class DefaultPaxosEnvironment implements Environment {
     public void sendResponse(UUID requestId, byte[] response) {
         var result = Optional.ofNullable(response).orElse(new byte[0]);
 
-        requests.get(requestId).complete(result);
+        requests.remove(requestId).complete(result);
 //        Optional.ofNullable(requests.get(requestId))
 //                .map((r) -> r.complete(result));
     }
@@ -101,10 +101,10 @@ public class DefaultPaxosEnvironment implements Environment {
     private CompletableFuture<byte[]> handleMessage(byte[] bytes) {
         var paxosMessage = Paxos.PaxosMessage.parseFrom(bytes);
         var requestId = UUID.randomUUID();
-        var request = new PaxosRequest(requestId, paxosMessage);
-        putMessageToQueues(request);
         var future = new CompletableFuture<byte[]>();
         requests.put(requestId, future);
+        var request = new PaxosRequest(requestId, paxosMessage);
+        putMessageToQueues(request);
         return future;
     }
 

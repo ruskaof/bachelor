@@ -61,8 +61,6 @@ public class Acceptor {
                     .build();
             accepted.put(p2a.getSlotNumber(), pvalue);  // Store only the latest p-value per slot
             stateStore.saveAcceptedValue(p2a.getSlotNumber(), pvalue);
-
-            log.info("{}", acceptedLog());
         } else {
             log.info("Cannot accept value because its ballot number ({}, {}) is less than ({}, {})",
                     p2a.getBallotNumber().getRound(), p2a.getBallotNumber().getLeaderId(),
@@ -129,16 +127,5 @@ public class Acceptor {
         log.info("Collecting garbage with minApplied: {}", minApplied.get());
         this.accepted.entrySet().removeIf((e) -> e.getKey() <= minApplied.get());
         this.stateStore.clearAcceptedBelowSlot(minApplied.get() + 1);
-    }
-
-    private String acceptedLog() {
-        var sb = new StringJoiner(" ");
-        sb.add("Accepted:");
-        for (var e : accepted.entrySet()) {
-            sb.add("[" + e.getKey().toString() + "-" + LogUtils.ballotNumberStr(e.getValue().getBallotNumber()) + "|" + e.getValue().getCommand().getContent().toStringUtf8() + "]");
-        }
-
-        sb.add("LastApplied: " + lastApplied.toString());
-        return sb.toString();
     }
 }

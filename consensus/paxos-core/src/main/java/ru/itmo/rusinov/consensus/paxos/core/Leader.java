@@ -60,6 +60,8 @@ public class Leader {
                 this.proposals.put(pm.getSlotNumber(), pm.getCommand());
                 if (this.active) {
                     executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.getCommand(), pm.getSlotNumber()));
+                } else {
+                    log.info("Ignoring proposal because inactive");
                 }
             }
             case ADOPTED -> {

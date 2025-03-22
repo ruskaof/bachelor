@@ -86,5 +86,6 @@ public class Scout implements Runnable {
                 break;
             }
         }
+        log.info("Scout with id {} is done", id);
     }
 }

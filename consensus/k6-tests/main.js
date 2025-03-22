@@ -6,8 +6,8 @@ const BASE_URL = 'http://client:8080/store';
 
 export let options = {
     stages: [
-        { duration: '30s', target: 25 }, // Ramp up to 100 VUs
-        { duration: '1m', target: 25 }, // Stay at 100 VUs
+        { duration: '30s', target: 5 }, // Ramp up to 100 VUs
+        { duration: '1m', target: 5 }, // Stay at 100 VUs
         { duration: '30s', target: 0 },  // Ramp down to 0 VUs
     ],
     thresholds: {
