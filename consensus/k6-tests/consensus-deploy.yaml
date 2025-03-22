@@ -9,19 +9,6 @@ services:
       - backend
     environment:
       CLIENT_CONSENSUS_PROTOCOL: raft
-
-#  k6:
-#    image: grafana/k6
-#    container_name: k6_test
-#    depends_on:
-#      - api
-#    volumes:
-#      - ./main.js:/test.js
-#    command: ["run", "/test.js"]
-#    networks:
-#      - backend
-#    environment:
-#      - BASE_URL=http://api:8080
   
   kv-peer-1:
     build: ../kv-store

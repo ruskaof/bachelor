@@ -380,7 +380,6 @@ public class RaftServer {
             if (r.equals(id) || maxSentLogs.getOrDefault(r, 0L) >= nextIndex.get(r)) {
                 continue;
             }
-            // fixme do not commit from prev terms
             if (nextIndex.get(r) > lastIndex) {
                 continue;
             }
