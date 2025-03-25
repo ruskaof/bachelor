@@ -13,6 +13,8 @@ public interface Environment extends AutoCloseable {
     CompletableFuture<byte[]> sendMessage(String destination, PaxosMessage paxosMessage);
     void sendResponse(UUID requestId, byte[] response);
 
+    void sendMessageToColocatedLeader(Paxos.PaxosMessage paxosMessage);
+    void sendMessageToColocatedReplica(Paxos.PaxosMessage paxosMessage);
     PaxosRequest getNextAcceptorMessage();
     PaxosRequest getNextLeaderMessage();
     PaxosRequest getNextScoutMessage(UUID scoutId);

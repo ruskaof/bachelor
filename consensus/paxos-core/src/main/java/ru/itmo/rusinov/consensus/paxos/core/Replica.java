@@ -41,17 +41,14 @@ public class Replica {
             if (!decisions.containsKey(this.slotIn)) {
                 var cmd = this.requests.poll();
                 this.proposals.put(this.slotIn, cmd);
-                for (String l : config.replicas()) {
-                    var pm = Paxos.ProposeMessage.newBuilder()
-                            .setSlotNumber(slotIn)
-                            .setCommand(cmd);
-                    var pmMessage = Paxos.PaxosMessage.newBuilder()
-                            .setSrc(this.id)
-                            .setPropose(pm)
-                            .build();
-
-                    this.environment.sendMessage(l, pmMessage);
-                }
+                var pm = Paxos.ProposeMessage.newBuilder()
+                        .setSlotNumber(slotIn)
+                        .setCommand(cmd);
+                var pmMessage = Paxos.PaxosMessage.newBuilder()
+                        .setSrc(this.id)
+                        .setPropose(pm)
+                        .build();
+                this.environment.sendMessageToColocatedLeader(pmMessage);
             }
             this.slotIn++;
         }
@@ -109,6 +106,24 @@ public class Replica {
                         }
                         this.perform(this.decisions.get(this.slotOut), sendResponse);
                     }
+                }
+                case INACTIVE -> {
+                    var im = msg.getInactive();
+                    for (var r : requests) {
+                        var result = Paxos.CommandResult.newBuilder()
+                                .setSuggestedLeader(im.getSuggestedLeader())
+                                .build();
+                        environment.sendResponse(UUID.fromString(r.getRequestId()), result.toByteArray());
+                    }
+                    requests.clear();
+
+                    for (var r: proposals.values()) {
+                        var result = Paxos.CommandResult.newBuilder()
+                                .setSuggestedLeader(im.getSuggestedLeader())
+                                .build();
+                        environment.sendResponse(UUID.fromString(r.getRequestId()), result.toByteArray());
+                    }
+                    proposals.clear();
                 }
             }
             this.propose();

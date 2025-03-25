@@ -6,9 +6,8 @@ const BASE_URL = 'http://client:8080/store';
 
 export let options = {
     stages: [
-        { duration: '30s', target: 5 }, // Ramp up to 100 VUs
-        { duration: '1m', target: 5 }, // Stay at 100 VUs
-        { duration: '30s', target: 0 },  // Ramp down to 0 VUs
+        { duration: '30s', target: 10 },
+        { duration: '2m', target: 10 },
     ],
     thresholds: {
         'http_req_duration': ['p(95)<300'], // 95% of requests must complete below 300ms

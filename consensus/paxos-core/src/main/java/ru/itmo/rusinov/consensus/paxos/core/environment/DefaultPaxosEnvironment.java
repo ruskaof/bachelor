@@ -6,6 +6,7 @@ import paxos.Paxos;
 import ru.itmo.rusinov.consensus.common.DistributedServer;
 import ru.itmo.rusinov.consensus.common.EnvironmentClient;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -31,6 +32,18 @@ public class DefaultPaxosEnvironment implements Environment {
         this.environmentClient = environmentClient;
     }
 
+    @SneakyThrows
+    @Override
+    public void sendMessageToColocatedLeader(Paxos.PaxosMessage paxosMessage) {
+        leaderQueue.put(new PaxosRequest(null, paxosMessage));
+    }
+
+    @SneakyThrows
+    @Override
+    public void sendMessageToColocatedReplica(Paxos.PaxosMessage paxosMessage) {
+        replicaQueue.put(new PaxosRequest(null, paxosMessage));
+    }
+
     @Override
     public CompletableFuture<byte[]> sendMessage(String destination, Paxos.PaxosMessage paxosMessage) {
         return environmentClient.sendMessage(paxosMessage.toByteArray(), destination);
@@ -41,15 +54,13 @@ public class DefaultPaxosEnvironment implements Environment {
         var result = Optional.ofNullable(response).orElse(new byte[0]);
 
         requests.remove(requestId).complete(result);
-//        Optional.ofNullable(requests.get(requestId))
-//                .map((r) -> r.complete(result));
     }
 
     @SneakyThrows
     @Override
     public PaxosRequest getNextAcceptorMessage() {
         var request = acceptorQueue.take();
-         sendResponse(request.requestId(), new byte[0]);
+        sendResponse(request.requestId(), new byte[0]);
         return request;
     }
 
@@ -57,7 +68,9 @@ public class DefaultPaxosEnvironment implements Environment {
     @Override
     public PaxosRequest getNextLeaderMessage() {
         var request = leaderQueue.take();
-        sendResponse(request.requestId(), new byte[0]);
+        if (Objects.nonNull(request.requestId())) {
+            sendResponse(request.requestId(), new byte[0]);
+        }
         return request;
     }
 
@@ -113,7 +126,7 @@ public class DefaultPaxosEnvironment implements Environment {
 
             case REQUEST, DECISION -> replicaQueue.put(paxosRequest);
 
-            case PROPOSE, ADOPTED, PREEMPTED -> leaderQueue.put(paxosRequest);
+            case PROPOSE, ADOPTED, PREEMPTED, PING -> leaderQueue.put(paxosRequest);
 
             case P1B -> scoutQueues
                     .computeIfAbsent(paxosRequest.message().getP1B().getScoutId(),

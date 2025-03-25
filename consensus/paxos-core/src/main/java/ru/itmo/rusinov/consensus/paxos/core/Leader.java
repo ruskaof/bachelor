@@ -5,6 +5,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
 import paxos.Paxos.BallotNumber;
@@ -27,6 +29,8 @@ public class Leader {
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final DurableStateStore durableStateStore;
 
+    private String suggestedLeader = null;
+
     public Leader(String id, Environment environment, Config config, DurableStateStore durableStateStore) {
         this.id = id;
         this.environment = environment;
@@ -40,7 +44,7 @@ public class Leader {
 
     public void run() {
         log.info("Starting leader {}", id);
-        executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L)));
+        executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L), null));
         while (true) {
             handleMessage(this.environment.getNextLeaderMessage());
         }
@@ -62,6 +66,16 @@ public class Leader {
                     executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.getCommand(), pm.getSlotNumber()));
                 } else {
                     log.info("Ignoring proposal because inactive");
+
+                    if (Objects.nonNull(suggestedLeader)) {
+                        var im = Paxos.InactiveMessage.newBuilder()
+                                .setSuggestedLeader(suggestedLeader)
+                                .build();
+                        var inactiveMessage = Paxos.PaxosMessage.newBuilder()
+                                .setInactive(im)
+                                .build();
+                        environment.sendMessageToColocatedReplica(inactiveMessage);
+                    }
                 }
             }
             case ADOPTED -> {
@@ -92,11 +106,13 @@ public class Leader {
                             .setRound(pm.getBallotNumber().getRound() + 1)
                             .setLeaderId(this.id)
                             .build();
-                    executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L)));
+                    executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L), pm.getBallotNumber().getLeaderId()));
                     this.active = false;
                 } else {
                     log.info("Preempted is ignored because ({}, {}) less than ({}, {})", pm.getBallotNumber().getRound(), pm.getBallotNumber().getLeaderId(), ballotNumber.getRound(), ballotNumber.getLeaderId());
                 }
+            }
+            case PING -> {
             }
 
             default -> log.error("Unknown message: {}", message);

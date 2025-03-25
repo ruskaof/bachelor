@@ -24,6 +24,7 @@ message Command {
 
 message CommandResult {
   bytes content = 1;
+  optional string suggested_leader = 2;
 }
 
 message PaxosMessage {
@@ -39,6 +40,8 @@ message PaxosMessage {
     PreemptedMessage preempted = 8;
     ProposeMessage propose = 9;
     RequestMessage request = 10;
+    InactiveMessage inactive = 11;
+    PingMessage ping = 12;
   }
 }
 
@@ -88,4 +91,11 @@ message ProposeMessage {
 
 message RequestMessage {
   ClientCommand command = 1;
+}
+
+message InactiveMessage {
+  string suggested_leader = 1;
+}
+
+message PingMessage {
 }

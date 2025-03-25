@@ -30,6 +30,7 @@ public class SimpleEnvironmentClient implements EnvironmentClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://" + destinations.get(serverId) + "/request"))
                 .POST(HttpRequest.BodyPublishers.ofByteArray(message))
+                .timeout(Duration.ofMillis(150))
                 .build();
 
         return client.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
