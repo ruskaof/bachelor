@@ -12,9 +12,11 @@ import java.util.concurrent.CompletableFuture;
 public class SimpleEnvironmentClient implements EnvironmentClient {
     private final HttpClient client;
     private final Map<String, String> destinations;
+    private final long requestTimeoutMillis;
 
-    public SimpleEnvironmentClient(Map<String, String> destinations) {
+    public SimpleEnvironmentClient(Map<String, String> destinations, long requestTimeoutMillis) {
         this.destinations = destinations;
+        this.requestTimeoutMillis = requestTimeoutMillis;
         this.client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(100))
                 .build();
@@ -30,7 +32,7 @@ public class SimpleEnvironmentClient implements EnvironmentClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://" + destinations.get(serverId) + "/request"))
                 .POST(HttpRequest.BodyPublishers.ofByteArray(message))
-                .timeout(Duration.ofMillis(150))
+                .timeout(Duration.ofMillis(requestTimeoutMillis))
                 .build();
 
         return client.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())

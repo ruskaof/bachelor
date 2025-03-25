@@ -110,7 +110,7 @@ public class KvStoreApplication {
         var server = new PaxosServer(
                 id,
                 stateMachine,
-                new DefaultPaxosEnvironment(new SimpleDistributedServer(port), new SimpleEnvironmentClient(destinations)),
+                new DefaultPaxosEnvironment(new SimpleDistributedServer(port), new SimpleEnvironmentClient(destinations, 150)),
                 config,
                 new File(storagePath),
                 new MapDBDurableStateStore()
@@ -154,7 +154,7 @@ public class KvStoreApplication {
                 new ru.itmo.rusinov.consensus.raft.core.MapDBDurableStateStore(),
                 id,
                 destinations.keySet(),
-                new SimpleEnvironmentClient(destinations),
+                new SimpleEnvironmentClient(destinations, 150),
                 new SimpleDistributedServer(port),
                 stateMachine,
                 new File(storagePath)

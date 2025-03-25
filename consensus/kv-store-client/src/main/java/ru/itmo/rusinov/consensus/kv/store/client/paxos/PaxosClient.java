@@ -1,65 +1,63 @@
 package ru.itmo.rusinov.consensus.kv.store.client.paxos;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
+import raft.Raft;
 import ru.itmo.rusinov.Message;
 import ru.itmo.rusinov.consensus.common.EnvironmentClient;
 
 import java.util.List;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class PaxosClient {
     private final List<String> replicaIds;
     private final EnvironmentClient environmentClient;
-    private final AtomicInteger replicaIndex = new AtomicInteger(0);
+    private final AtomicReference<String> currentLeader;
 
     public PaxosClient(List<String> replicaIds, EnvironmentClient environmentClient) {
         this.replicaIds = replicaIds;
         this.environmentClient = environmentClient;
+        this.currentLeader = new AtomicReference<>(replicaIds.getFirst());
     }
 
-    private String selectReplica() {
-        int index = replicaIndex.getAndUpdate(i -> (i + 1) % replicaIds.size());
-        return replicaIds.get(index);
-    }
-
-    private Paxos.CommandResult sendCommand(Paxos.ClientCommand paxosCommand) {
-        return sendCommandToReplica(paxosCommand, 0);
-    }
-
-    private Paxos.CommandResult sendCommandToReplica(Paxos.ClientCommand paxosCommand, int attempt) {
-        if (attempt >= replicaIds.size()) {
-            throw new RuntimeException("All replicas failed");
-        }
-
-        String replica = selectReplica();
-        log.info("Sending request to replica: {}", replica);
-
-        var message = Paxos.PaxosMessage.newBuilder()
+    @SneakyThrows
+    private byte[] sendPaxosMessage(Paxos.ClientCommand clientCommand) {
+        var request = Paxos.PaxosMessage.newBuilder()
                 .setRequest(
                         Paxos.RequestMessage.newBuilder()
-                                .setCommand(paxosCommand)
+                                .setCommand(clientCommand)
                                 .build()
                 )
                 .build();
 
-        try {
-            byte[] response = environmentClient.sendMessage(message.toByteArray(), replica).get();
-            return Paxos.CommandResult.parseFrom(response);
-        } catch (InvalidProtocolBufferException e) {
-            throw new RuntimeException("Failed to parse response from replica", e);
-        } catch (Exception ex) {
-            log.error("Exception while contacting replica {}: {}", replica, ex.getMessage());
-            return sendCommandToReplica(paxosCommand, attempt + 1);
+        while (true) {
+            var leader = currentLeader.get();
+
+            try {
+
+                log.info("Sending set to paxos replica {}", leader);
+                var responseBytes = environmentClient.sendMessage(request.toByteArray(), leader).get();
+                var response = Paxos.CommandResult.parseFrom(responseBytes);
+                if (!response.getSuggestedLeader().isEmpty()) {
+                    log.info("Suggested leader: {}", response.getSuggestedLeader());
+                    currentLeader.compareAndSet(leader, response.getSuggestedLeader());
+                } else {
+                    return response.getContent().toByteArray();
+                }
+            } catch (Exception e) {
+                log.error("Error sending request", e);
+                currentLeader.compareAndSet(leader, replicaIds.get((replicaIds.indexOf(leader) + 1) % replicaIds.size()));
+            }
         }
     }
 
+    @SneakyThrows
     public void setStringValue(String key, String value) {
-        Paxos.ClientCommand command = Paxos.ClientCommand.newBuilder()
+        var command = Paxos.ClientCommand.newBuilder()
                 .setContent(Message.KvStoreProtoMessage.newBuilder()
                         .setSet(Message.SetMessage.newBuilder()
                                 .setKey(ByteString.copyFromUtf8(key))
@@ -67,10 +65,12 @@ public class PaxosClient {
                                 .build())
                         .build()
                         .toByteString())
-                .build();
-        sendCommand(command);
+                        .build();
+
+        sendPaxosMessage(command);
     }
 
+    @SneakyThrows
     public String getStringValue(String key) {
         Paxos.ClientCommand command = Paxos.ClientCommand.newBuilder()
                 .setContent(Message.KvStoreProtoMessage.newBuilder()
@@ -80,6 +80,7 @@ public class PaxosClient {
                         .build()
                         .toByteString())
                 .build();
-        return sendCommand(command).getContent().toStringUtf8();
+
+        return new String(sendPaxosMessage(command));
     }
 }

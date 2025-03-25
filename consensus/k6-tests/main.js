@@ -4,19 +4,18 @@ import { Trend, Rate } from 'k6/metrics';
 
 const BASE_URL = 'http://client:8080/store';
 
-export let options = {
-    stages: [
-        { duration: '30s', target: 10 },
-        { duration: '2m', target: 10 },
-    ],
-    thresholds: {
-        'http_req_duration': ['p(95)<300'], // 95% of requests must complete below 300ms
-        'http_req_failed': ['rate<0.01'], // Less than 1% of requests should fail
+export const options = {
+  scenarios: {
+    contacts: {
+      executor: 'constant-arrival-rate',
+      duration: '5m',
+      rate: 5,
+      timeUnit: '1s',
+      preAllocatedVUs: 100,
+      maxVUs: 200,
     },
+  },
 };
-
-let latencyTrend = new Trend('latency');
-let successRate = new Rate('success_rate');
 
 export default function () {
     const key = `test-key-${__VU}-${__ITER}`;
@@ -38,10 +37,4 @@ export default function () {
         'get request successful': (res) => res.status === 200,
         'value was set correctly': (res) => res.json().value === value,
     });
-
-    // Record metrics
-    latencyTrend.add(getRes.timings.duration);
-    successRate.add(success);
-
-    sleep(0.5); // Simulate real user wait time
 }

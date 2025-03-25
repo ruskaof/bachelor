@@ -52,7 +52,10 @@ public class Leader {
 
     private void handleMessage(PaxosRequest request) {
         var message = request.message();
-        log.info("Handling message {} from {}", message.getMessageCase(), message.getSrc());
+
+        if (!message.getMessageCase().equals(Paxos.PaxosMessage.MessageCase.PING)) {
+            log.info("Handling message {} from {}", message.getMessageCase(), message.getSrc());
+        }
 
         switch (message.getMessageCase()) {
             case PROPOSE -> {
@@ -65,17 +68,9 @@ public class Leader {
                 if (this.active) {
                     executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.getCommand(), pm.getSlotNumber()));
                 } else {
-                    log.info("Ignoring proposal because inactive");
+                    log.info("Ignoring proposal because inactive. Suggested leader: {}", suggestedLeader);
 
-                    if (Objects.nonNull(suggestedLeader)) {
-                        var im = Paxos.InactiveMessage.newBuilder()
-                                .setSuggestedLeader(suggestedLeader)
-                                .build();
-                        var inactiveMessage = Paxos.PaxosMessage.newBuilder()
-                                .setInactive(im)
-                                .build();
-                        environment.sendMessageToColocatedReplica(inactiveMessage);
-                    }
+                    notifyReplicaInactive();
                 }
             }
             case ADOPTED -> {
@@ -97,6 +92,7 @@ public class Leader {
                 collectGarbage();
                 this.proposals.forEach((sn, c) ->
                         executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, c, sn)));
+                log.info("Becoming active");
                 this.active = true;
             }
             case PREEMPTED -> {
@@ -107,6 +103,8 @@ public class Leader {
                             .setLeaderId(this.id)
                             .build();
                     executor.submit(new Scout(id, UUID.randomUUID(), environment, config, ballotNumber, durableStateStore.loadLastAppliedSlot().orElse(-1L), pm.getBallotNumber().getLeaderId()));
+                    suggestedLeader = pm.getBallotNumber().getLeaderId();
+                    notifyReplicaInactive();
                     this.active = false;
                 } else {
                     log.info("Preempted is ignored because ({}, {}) less than ({}, {})", pm.getBallotNumber().getRound(), pm.getBallotNumber().getLeaderId(), ballotNumber.getRound(), ballotNumber.getLeaderId());
@@ -116,6 +114,18 @@ public class Leader {
             }
 
             default -> log.error("Unknown message: {}", message);
+        }
+    }
+
+    private void notifyReplicaInactive() {
+        if (Objects.nonNull(suggestedLeader)) {
+            var im = Paxos.InactiveMessage.newBuilder()
+                    .setSuggestedLeader(suggestedLeader)
+                    .build();
+            var inactiveMessage = Paxos.PaxosMessage.newBuilder()
+                    .setInactive(im)
+                    .build();
+            environment.sendMessageToColocatedReplica(inactiveMessage);
         }
     }
 

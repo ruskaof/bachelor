@@ -38,6 +38,7 @@ public class Scout implements Runnable {
         log.info("Running scout with id {}", id);
 
         if (Objects.nonNull(activeLeaderId)) {
+            log.info("Monitoring leader {}", activeLeaderId);
             while (true) {
                 var ping = Paxos.PaxosMessage.newBuilder()
                         .setPing(Paxos.PingMessage.newBuilder().build())
