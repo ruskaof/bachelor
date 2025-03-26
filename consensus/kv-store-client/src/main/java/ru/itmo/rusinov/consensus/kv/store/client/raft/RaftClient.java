@@ -41,6 +41,7 @@ public class RaftClient {
                     return response.getCommandResult().getValue().toByteArray();
                 }
             } catch (Exception e) {
+                log.warn("Got error:", e);
                 currentLeader.compareAndSet(leader, replicaIds.get((replicaIds.indexOf(leader) + 1) % replicaIds.size()));
             }
         }

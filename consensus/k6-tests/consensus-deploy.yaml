@@ -22,7 +22,7 @@ services:
       KV_STORE_PROTOCOL: "raft"
       RATIS_KV_PEER_ID: 1
       RATIS_KV_PORT: 8081
-      RATIS_KV_PEERS: 1:localhost:8081,2:kv-peer-2:8082,3:kv-peer-3:8083
+      RATIS_KV_PEERS: 1:localhost:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:kv-peer-4:8084,5:kv-peer-5:8085
       RATIS_KV_GROUP_ID: kvStoreRaftGroup
       RATIS_KV_STORAGE_PATH: /var/lib/kvstore/data
   kv-peer-2:
@@ -37,7 +37,7 @@ services:
       KV_STORE_PROTOCOL: "raft"
       RATIS_KV_PEER_ID: 2
       RATIS_KV_PORT: 8082
-      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:localhost:8082,3:kv-peer-3:8083
+      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:localhost:8082,3:kv-peer-3:8083,4:kv-peer-4:8084,5:kv-peer-5:8085
       RATIS_KV_GROUP_ID: kvStoreRaftGroup
       RATIS_KV_STORAGE_PATH: /var/lib/kvstore/data
   kv-peer-3:
@@ -52,13 +52,47 @@ services:
       KV_STORE_PROTOCOL: "raft"
       RATIS_KV_PEER_ID: 3
       RATIS_KV_PORT: 8083
-      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:localhost:8083
+      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:localhost:8083,4:kv-peer-4:8084,5:kv-peer-5:8085
       RATIS_KV_GROUP_ID: kvStoreRaftGroup
       RATIS_KV_STORAGE_PATH: /var/lib/kvstore/data
+
+  kv-peer-4:
+    build: ../kv-store
+    ports:
+      - "8084:8084"
+    networks:
+      - backend
+    volumes:
+      - kv-peer-4:/var/lib/kvstore/data
+    environment:
+      KV_STORE_PROTOCOL: "raft"
+      RATIS_KV_PEER_ID: 4
+      RATIS_KV_PORT: 8084
+      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:localhost:8084,5:kv-peer-5:8085
+      RATIS_KV_GROUP_ID: kvStoreRaftGroup
+      RATIS_KV_STORAGE_PATH: /var/lib/kvstore/data
+  kv-peer-5:
+    build: ../kv-store
+    ports:
+      - "8085:8085"
+    networks:
+      - backend
+    volumes:
+      - kv-peer-5:/var/lib/kvstore/data
+    environment:
+      KV_STORE_PROTOCOL: "raft"
+      RATIS_KV_PEER_ID: 5
+      RATIS_KV_PORT: 8085
+      RATIS_KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:kv-peer-5:8084,5:localhost:8085
+      RATIS_KV_GROUP_ID: kvStoreRaftGroup
+      RATIS_KV_STORAGE_PATH: /var/lib/kvstore/data
+
 volumes:
   kv-peer-1:
   kv-peer-2:
   kv-peer-3:
+  kv-peer-4:
+  kv-peer-5:
 networks:
   backend:
 
