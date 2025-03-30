@@ -34,7 +34,7 @@ public class PaxosClient {
                 )
                 .build();
 
-        while (true) {
+        for (var retry = 0; retry < replicaIds.size(); retry ++) {
             var leader = currentLeader.get();
 
             try {
@@ -53,6 +53,8 @@ public class PaxosClient {
                 currentLeader.compareAndSet(leader, replicaIds.get((replicaIds.indexOf(leader) + 1) % replicaIds.size()));
             }
         }
+
+        throw new RuntimeException("Could not send request to any replica");
     }
 
     @SneakyThrows
