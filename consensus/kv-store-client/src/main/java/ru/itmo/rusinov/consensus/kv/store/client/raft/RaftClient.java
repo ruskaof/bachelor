@@ -34,17 +34,25 @@ public class RaftClient {
                 log.info("Sending set to raft replica {}", leader);
                 var responseBytes = environmentClient.sendMessage(raftServerRequest.toByteArray(), leader).get();
                 var response = Raft.ClientResponse.parseFrom(responseBytes);
-                if (!response.getSuggestedLeader().isEmpty()) {
-                    log.info("Suggested leader: {}", response.getSuggestedLeader());
-                    currentLeader.compareAndSet(leader, response.getSuggestedLeader());
+                if (!response.hasCommandResult()) {
+                    if (response.hasSuggestedLeader()) {
+                        log.info("Suggested leader: {}", response.getSuggestedLeader());
+                        currentLeader.compareAndSet(leader, response.getSuggestedLeader());
+                    } else {
+                        changeCurrentLeader(leader);
+                    }
                 } else {
                     return response.getCommandResult().getValue().toByteArray();
                 }
             } catch (Exception e) {
                 log.warn("Got error:", e);
-                currentLeader.compareAndSet(leader, replicaIds.get((replicaIds.indexOf(leader) + 1) % replicaIds.size()));
+                changeCurrentLeader(leader);
             }
         }
+    }
+
+    private void changeCurrentLeader(String leader) {
+        currentLeader.compareAndSet(leader, replicaIds.get((replicaIds.indexOf(leader) + 1) % replicaIds.size()));
     }
 
     @SneakyThrows

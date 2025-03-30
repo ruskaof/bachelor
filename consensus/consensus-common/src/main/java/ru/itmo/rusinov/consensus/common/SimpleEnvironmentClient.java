@@ -18,7 +18,7 @@ public class SimpleEnvironmentClient implements EnvironmentClient {
         this.destinations = destinations;
         this.requestTimeoutMillis = requestTimeoutMillis;
         this.client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(100))
+                .connectTimeout(Duration.ofMillis(25))
                 .build();
     }
 

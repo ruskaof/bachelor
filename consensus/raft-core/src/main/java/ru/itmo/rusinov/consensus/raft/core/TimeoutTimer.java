@@ -16,7 +16,7 @@ public class TimeoutTimer {
     }
 
     public void resetTimer() {
-        nextTimeout = Instant.now().plusMillis(random.nextInt(1000, 3000));
+        nextTimeout = Instant.now().plusMillis(random.nextInt(150, 300));
     }
 
     public void deactivateTimer() {

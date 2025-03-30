@@ -55,8 +55,8 @@ message InternalClientRequest {
 }
 
 message ClientResponse {
-  RaftCommandResult command_result = 1;
-  string suggested_leader = 2;
+  optional RaftCommandResult command_result = 1;
+  optional string suggested_leader = 2;
 }
 
 message RaftServerRequest {
@@ -67,8 +67,8 @@ message RaftServerRequest {
 }
 
 message RaftMessage {
-  string src = 1;
-  int64 term = 2;
+  optional string src = 1;
+  optional int64 term = 2;
 
   oneof message {
     AppendEntriesRPC append_entries = 3;

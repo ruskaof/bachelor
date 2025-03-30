@@ -130,7 +130,9 @@ public class RaftServer {
         var responseBuilder = Raft.ClientResponse.newBuilder();
 
         if (!currentRole.equals(RaftRole.LEADER)) {
-            responseBuilder.setSuggestedLeader(votedFor);
+            if (Objects.nonNull(votedFor)) {
+                responseBuilder.setSuggestedLeader(votedFor);
+            }
             future.complete(responseBuilder.build());
             log.info("Not a leader, skipping client request");
             return;
@@ -274,6 +276,10 @@ public class RaftServer {
     }
 
     private void updateTerm(Raft.RaftMessage raftMessage) {
+        if (!raftMessage.hasTerm()) {
+            return;
+        }
+
         if (currentTerm < raftMessage.getTerm()) {
             currentTerm = raftMessage.getTerm();
             durableStateStore.saveCurrentTerm(currentTerm);
@@ -446,7 +452,7 @@ public class RaftServer {
     }
 
     private class ElectionTimerChecker implements Runnable {
-        private final Duration tickDuration = Duration.ofMillis(250);
+        private final Duration tickDuration = Duration.ofMillis(25);
 
         @Override
         public void run() {
