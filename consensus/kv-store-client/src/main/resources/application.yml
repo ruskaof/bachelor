@@ -11,5 +11,9 @@ servers:
       address: kv-peer-4:8084
     - id: 5
       address: kv-peer-5:8085
+    - id: 6
+      address: kv-peer-6:8086
+    - id: 7
+      address: kv-peer-7:8087
 consensus:
   protocol: ${CLIENT_CONSENSUS_PROTOCOL:raft}

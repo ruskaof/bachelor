@@ -61,6 +61,7 @@ public class Leader {
             case PROPOSE -> {
                 var pm = message.getPropose();
                 if (this.proposals.containsKey(pm.getSlotNumber())) {
+                    log.info("Already proposed this slot number, ignoring proposal");
                     return;
                 }
 
