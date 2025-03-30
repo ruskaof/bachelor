@@ -26,7 +26,7 @@ public class RaftClient {
     @SneakyThrows
     private byte[] sendRaftMessage(Raft.RaftServerRequest raftServerRequest) {
 
-        while (true) {
+        for (var retry = 0; retry < replicaIds.size(); retry ++) {
             var leader = currentLeader.get();
 
             try {
@@ -49,6 +49,8 @@ public class RaftClient {
                 changeCurrentLeader(leader);
             }
         }
+
+        throw new RuntimeException("Could not send request to any replica");
     }
 
     private void changeCurrentLeader(String leader) {

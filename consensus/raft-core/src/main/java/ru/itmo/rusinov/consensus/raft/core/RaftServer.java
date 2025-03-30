@@ -356,6 +356,9 @@ public class RaftServer {
         if (parsedMessage.getMessageCase().equals(Raft.RaftServerRequest.MessageCase.CLIENT_REQUEST)) {
             var requestId = UUID.randomUUID();
 
+            var future = new CompletableFuture<Raft.ClientResponse>();
+            awaitingClientRequests.put(requestId, future);
+
             messagesQueue.put(
                     Raft.RaftMessage.newBuilder()
                             .setClientRequest(
@@ -366,8 +369,6 @@ public class RaftServer {
                             )
                             .build()
             );
-            var future = new CompletableFuture<Raft.ClientResponse>();
-            awaitingClientRequests.put(requestId, future);
 
             return future.thenApply(AbstractMessageLite::toByteArray);
         } else {
