@@ -13,16 +13,6 @@ import java.util.stream.Collectors;
 @EnableConfigurationProperties(PeerConfigurationProperties.class)
 public class ClientsConfiguration {
 
-//    @Bean
-//    public RaftClient raftClient(PeerConfigurationProperties peerConfigurationProperties) {
-//        var peers = peerConfigurationProperties.peers().stream().map((p) -> RaftPeer.newBuilder().setId(p.id()).setAddress(p.address()).build()).toList();
-//        var raftGroup = RaftGroupId.valueOf(ByteString.copyFromUtf8(peerConfigurationProperties.groupId()));
-//
-//        var properties = new RaftProperties();
-//
-//        return RaftClient.newBuilder().setRaftGroup(RaftGroup.valueOf(raftGroup, peers)).setProperties(properties).setClientRpc(new GrpcFactory(new Parameters()).newRaftClientRpc(ClientId.randomId(), properties)).setPrimaryDataStreamServer(peers.getFirst()).build();
-//    }
-
     @Bean
     public PaxosClient paxosClient(PeerConfigurationProperties peerConfigurationProperties) {
         var destinations = peerConfigurationProperties.peers()
@@ -32,7 +22,7 @@ public class ClientsConfiguration {
                         PeerConfigurationProperties.PeerConfiguration::address
                 ));
 
-        var envClient = new SimpleEnvironmentClient(destinations, 150000);
+        var envClient = new SimpleEnvironmentClient(destinations, 150);
         envClient.initialize();
 
         return new PaxosClient(destinations.keySet().stream().toList(), envClient);
