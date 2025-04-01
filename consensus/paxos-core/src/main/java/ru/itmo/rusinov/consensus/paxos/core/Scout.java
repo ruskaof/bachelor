@@ -52,7 +52,7 @@ public class Scout implements Runnable {
                     break;
                 }
 
-                Thread.sleep(25);
+                Thread.sleep(100);
             }
         }
 

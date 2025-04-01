@@ -22,7 +22,7 @@ public class ClientsConfiguration {
                         PeerConfigurationProperties.PeerConfiguration::address
                 ));
 
-        var envClient = new SimpleEnvironmentClient(destinations, 300);
+        var envClient = new SimpleEnvironmentClient(destinations, 15000);
         envClient.initialize();
 
         return new PaxosClient(destinations.keySet().stream().toList(), envClient);
@@ -37,7 +37,7 @@ public class ClientsConfiguration {
                         PeerConfigurationProperties.PeerConfiguration::address
                 ));
 
-        var envClient = new SimpleEnvironmentClient(destinations, 300);
+        var envClient = new SimpleEnvironmentClient(destinations, 15000);
         envClient.initialize();
 
         return new RaftClient(destinations.keySet().stream().toList(), envClient);

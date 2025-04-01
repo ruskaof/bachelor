@@ -113,6 +113,11 @@ public class DefaultPaxosEnvironment implements Environment {
     @SneakyThrows
     private CompletableFuture<byte[]> handleMessage(byte[] bytes) {
         var paxosMessage = Paxos.PaxosMessage.parseFrom(bytes);
+
+        if (paxosMessage.getMessageCase().equals(Paxos.PaxosMessage.MessageCase.PING)) {
+            return CompletableFuture.completedFuture(new byte[0]);
+        }
+
         var requestId = UUID.randomUUID();
         var future = new CompletableFuture<byte[]>();
         requests.put(requestId, future);
@@ -126,7 +131,7 @@ public class DefaultPaxosEnvironment implements Environment {
 
             case REQUEST, DECISION -> replicaQueue.put(paxosRequest);
 
-            case PROPOSE, ADOPTED, PREEMPTED, PING -> leaderQueue.put(paxosRequest);
+            case PROPOSE, ADOPTED, PREEMPTED -> leaderQueue.put(paxosRequest);
 
             case P1B -> scoutQueues
                     .computeIfAbsent(paxosRequest.message().getP1B().getScoutId(),

@@ -67,6 +67,7 @@ public class Leader {
 
                 this.proposals.put(pm.getSlotNumber(), pm.getCommand());
                 if (this.active) {
+                    log.info("Starting new commander. Proposals: {}", proposals.size());
                     executor.submit(new Commander(id, UUID.randomUUID(), environment, config, ballotNumber, pm.getCommand(), pm.getSlotNumber()));
                 } else {
                     log.info("Ignoring proposal because inactive. Suggested leader: {}", suggestedLeader);

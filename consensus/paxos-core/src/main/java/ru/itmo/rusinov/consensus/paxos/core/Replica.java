@@ -12,7 +12,7 @@ import java.util.*;
 @Slf4j
 public class Replica {
 
-    private final long WINDOW = 5;
+    private static final long WINDOW = 1;
     private final DurableStateStore durableStateStore;
 
     private long slotIn = 1;
@@ -39,6 +39,7 @@ public class Replica {
     private void propose() {
         while (this.slotIn < this.slotOut + WINDOW && !this.requests.isEmpty()) {
             if (!decisions.containsKey(this.slotIn)) {
+                log.info("Proposing with slotIn={}, slotOut={}", slotIn, slotOut);
                 var cmd = this.requests.poll();
                 this.proposals.put(this.slotIn, cmd);
                 var pm = Paxos.ProposeMessage.newBuilder()
@@ -132,6 +133,6 @@ public class Replica {
     }
 
     private void logRequests() {
-        log.info("Requests: {}. Proposals: {}", requests.stream().map(Command::getRequestId).toList(), proposals.keySet());
+        log.info("Requests: {}. Proposals: {}. SlotIn: {}. SlotOut: {}", requests.size(), proposals.size(), slotIn, slotOut);
     }
 }

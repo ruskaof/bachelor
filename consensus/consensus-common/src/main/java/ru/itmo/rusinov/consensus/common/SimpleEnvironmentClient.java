@@ -7,12 +7,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SimpleEnvironmentClient implements EnvironmentClient {
     private final HttpClient client;
     private final Map<String, String> destinations;
     private final long requestTimeoutMillis;
+    private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public SimpleEnvironmentClient(Map<String, String> destinations, long requestTimeoutMillis) {
         this.destinations = destinations;
@@ -35,8 +39,17 @@ public class SimpleEnvironmentClient implements EnvironmentClient {
                 .timeout(Duration.ofMillis(requestTimeoutMillis))
                 .build();
 
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
-                .thenApply(HttpResponse::body);
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        Thread.sleep(25);
+                        return client.send(request, HttpResponse.BodyHandlers.ofByteArray()).body();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                executor
+        );
     }
 
     @Override
