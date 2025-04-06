@@ -34,7 +34,7 @@ public class PaxosClient {
                 )
                 .build();
 
-        for (var retry = 0; retry < replicaIds.size(); retry ++) {
+        for (var retry = 0; retry < replicaIds.size(); retry++) {
             var leader = currentLeader.get();
 
             try {

@@ -12,7 +12,7 @@ import java.util.*;
 @Slf4j
 public class Replica {
 
-    private static final long WINDOW = 1;
+    private static final long WINDOW = 5;
     private final DurableStateStore durableStateStore;
 
     private long slotIn = 1;
@@ -91,7 +91,6 @@ public class Replica {
                     this.requests.add(command);
                 }
                 case DECISION -> {
-                    environment.sendResponse(request.requestId(), new byte[0]);
                     var dm = msg.getDecision();
                     log.info("Got decision for slot {}, slotOut={}, slotIn={}", dm.getSlotNumber(), slotOut, slotIn);
                     this.decisions.put(dm.getSlotNumber(), dm.getCommand());

@@ -8,13 +8,17 @@ import ru.itmo.rusinov.consensus.common.EnvironmentClient;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
+
+import static paxos.Paxos.PaxosMessage.MessageCase.*;
 
 @Slf4j
 public class DefaultPaxosEnvironment implements Environment {
     private final DistributedServer distributedServer;
     private final EnvironmentClient environmentClient;
+    private final String replicaId;
 
     private final ConcurrentHashMap<UUID, CompletableFuture<byte[]>> requests = new ConcurrentHashMap<>();
 
@@ -27,9 +31,10 @@ public class DefaultPaxosEnvironment implements Environment {
     private final ConcurrentHashMap<String, LinkedBlockingQueue<PaxosRequest>> scoutQueues =
             new ConcurrentHashMap<>();
 
-    public DefaultPaxosEnvironment(DistributedServer distributedServer, EnvironmentClient environmentClient) {
+    public DefaultPaxosEnvironment(DistributedServer distributedServer, EnvironmentClient environmentClient, String replicaId) {
         this.distributedServer = distributedServer;
         this.environmentClient = environmentClient;
+        this.replicaId = replicaId;
     }
 
     @SneakyThrows
@@ -44,9 +49,20 @@ public class DefaultPaxosEnvironment implements Environment {
         replicaQueue.put(new PaxosRequest(null, paxosMessage));
     }
 
+    @SneakyThrows
     @Override
     public CompletableFuture<byte[]> sendMessage(String destination, Paxos.PaxosMessage paxosMessage) {
-        return environmentClient.sendMessage(paxosMessage.toByteArray(), destination);
+        if (replicaId.equals(destination)) {
+            putMessageToQueues(new PaxosRequest(null, paxosMessage));
+            return CompletableFuture.completedFuture(new byte[0]);
+        }
+
+        return environmentClient.sendMessage(paxosMessage.toByteArray(), destination)
+                .whenComplete((r, e) -> {
+                    if (Objects.nonNull(e)) {
+                        log.error("Could not send message {} to {}", paxosMessage.getMessageCase(), destination, e);
+                    }
+                });
     }
 
     @Override
@@ -59,37 +75,29 @@ public class DefaultPaxosEnvironment implements Environment {
     @SneakyThrows
     @Override
     public PaxosRequest getNextAcceptorMessage() {
-        var request = acceptorQueue.take();
-        sendResponse(request.requestId(), new byte[0]);
-        return request;
+        return acceptorQueue.take();
     }
 
     @SneakyThrows
     @Override
     public PaxosRequest getNextLeaderMessage() {
-        var request = leaderQueue.take();
-        if (Objects.nonNull(request.requestId())) {
-            sendResponse(request.requestId(), new byte[0]);
-        }
-        return request;
+        return leaderQueue.take();
     }
 
     @SneakyThrows
     @Override
     public PaxosRequest getNextScoutMessage(UUID scoutId) {
         scoutQueues.putIfAbsent(scoutId.toString(), new LinkedBlockingQueue<>());
-        var request = scoutQueues.get(scoutId.toString()).take();
-        sendResponse(request.requestId(), new byte[0]);
-        return request;
+
+        return scoutQueues.get(scoutId.toString()).take();
     }
 
     @SneakyThrows
     @Override
     public PaxosRequest getNextCommanderMessage(UUID commanderId) {
         commanderQueues.putIfAbsent(commanderId.toString(), new LinkedBlockingQueue<>());
-        var request = commanderQueues.get(commanderId.toString()).take();
-        sendResponse(request.requestId(), new byte[0]);
-        return request;
+
+        return commanderQueues.get(commanderId.toString()).take();
     }
 
     @SneakyThrows
@@ -122,6 +130,11 @@ public class DefaultPaxosEnvironment implements Environment {
         var future = new CompletableFuture<byte[]>();
         requests.put(requestId, future);
         var request = new PaxosRequest(requestId, paxosMessage);
+
+        if (!messagesWithResponse.contains(request.message().getMessageCase())) {
+            sendResponse(requestId, new byte[0]);
+        }
+
         putMessageToQueues(request);
         return future;
     }
@@ -145,4 +158,6 @@ public class DefaultPaxosEnvironment implements Environment {
             default -> throw new IllegalStateException("Unexpected value: " + paxosRequest);
         }
     }
+
+    private static final Set<Paxos.PaxosMessage.MessageCase> messagesWithResponse = Set.of(REQUEST);
 }

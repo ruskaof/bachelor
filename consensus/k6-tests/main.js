@@ -3,17 +3,30 @@ import { check } from 'k6';
 
 const BASE_URL = 'http://client:8080/store';
 
+//export const options = {
+//  scenarios: {
+//    ramping_scenario: {
+//      executor: 'ramping-arrival-rate',
+//      startRate: 0, // Start with 0 requests per second
+//      timeUnit: '1s',
+//      preAllocatedVUs: 100,
+//      maxVUs: 200,
+//      stages: [
+//        { duration: '10m', target: 50 }, // Ramp up to 100 req/sec over 10 minutes
+//      ],
+//    },
+//  },
+//};
+
 export const options = {
   scenarios: {
-    ramping_scenario: {
-      executor: 'ramping-arrival-rate',
-      startRate: 0, // Start with 0 requests per second
+    contacts: {
+      executor: 'constant-arrival-rate',
+      duration: '5m',
+      rate: 3,
       timeUnit: '1s',
       preAllocatedVUs: 100,
       maxVUs: 200,
-      stages: [
-        { duration: '10m', target: 50 }, // Ramp up to 100 req/sec over 10 minutes
-      ],
     },
   },
 };
