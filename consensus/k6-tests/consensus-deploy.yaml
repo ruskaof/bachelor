@@ -8,7 +8,7 @@ services:
     networks:
       - backend
     environment:
-      CLIENT_CONSENSUS_PROTOCOL: paxos
+      CLIENT_CONSENSUS_PROTOCOL: raft
   
   kv-peer-1:
     build: ../kv-store
@@ -19,7 +19,7 @@ services:
     volumes:
       - kv-peer-1:/var/lib/kvstore/data
     environment:
-      KV_STORE_PROTOCOL: "paxos"
+      KV_STORE_PROTOCOL: "raft"
       KV_PEER_ID: 1
       KV_PORT: 8081
       KV_PEERS: 1:localhost:8081,2:kv-peer-2:8082,3:kv-peer-3:8083 #,4:kv-peer-4:8084,5:kv-peer-5:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
@@ -33,7 +33,7 @@ services:
     volumes:
       - kv-peer-2:/var/lib/kvstore/data
     environment:
-      KV_STORE_PROTOCOL: "paxos"
+      KV_STORE_PROTOCOL: "raft"
       KV_PEER_ID: 2
       KV_PORT: 8082
       KV_PEERS: 1:kv-peer-1:8081,2:localhost:8082,3:kv-peer-3:8083 #,4:kv-peer-4:8084,5:kv-peer-5:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
@@ -47,40 +47,40 @@ services:
     volumes:
       - kv-peer-3:/var/lib/kvstore/data
     environment:
-      KV_STORE_PROTOCOL: "paxos"
+      KV_STORE_PROTOCOL: "raft"
       KV_PEER_ID: 3
       KV_PORT: 8083
       KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:localhost:8083 #,4:kv-peer-4:8084,5:kv-peer-5:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
       KV_STORAGE_PATH: /var/lib/kvstore/data
 
-#  kv-peer-4:
-#    build: ../kv-store
-#    ports:
-#      - "8084:8084"
-#    networks:
-#      - backend
-#    volumes:
-#      - kv-peer-4:/var/lib/kvstore/data
-#    environment:
-#      KV_STORE_PROTOCOL: "raft"
-#      KV_PEER_ID: 4
-#      KV_PORT: 8084
-#      KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:localhost:8084,5:kv-peer-5:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
-#      KV_STORAGE_PATH: /var/lib/kvstore/data
-#  kv-peer-5:
-#    build: ../kv-store
-#    ports:
-#      - "8085:8085"
-#    networks:
-#      - backend
-#    volumes:
-#      - kv-peer-5:/var/lib/kvstore/data
-#    environment:
-#      KV_STORE_PROTOCOL: "raft"
-#      KV_PEER_ID: 5
-#      KV_PORT: 8085
-#      KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:kv-peer-4:8084,5:localhost:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
-#      KV_STORAGE_PATH: /var/lib/kvstore/data
+  # kv-peer-4:
+  #   build: ../kv-store
+  #   ports:
+  #     - "8084:8084"
+  #   networks:
+  #     - backend
+  #   volumes:
+  #     - kv-peer-4:/var/lib/kvstore/data
+  #   environment:
+  #     KV_STORE_PROTOCOL: "paxos"
+  #     KV_PEER_ID: 4
+  #     KV_PORT: 8084
+  #     KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:localhost:8084,5:kv-peer-5:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
+  #     KV_STORAGE_PATH: /var/lib/kvstore/data
+  # kv-peer-5:
+  #   build: ../kv-store
+  #   ports:
+  #     - "8085:8085"
+  #   networks:
+  #     - backend
+  #   volumes:
+  #     - kv-peer-5:/var/lib/kvstore/data
+  #   environment:
+  #     KV_STORE_PROTOCOL: "paxos"
+  #     KV_PEER_ID: 5
+  #     KV_PORT: 8085
+  #     KV_PEERS: 1:kv-peer-1:8081,2:kv-peer-2:8082,3:kv-peer-3:8083,4:kv-peer-4:8084,5:localhost:8085 #,6:kv-peer-6:8086,7:kv-peer-7:8087
+  #     KV_STORAGE_PATH: /var/lib/kvstore/data
 #
 #  kv-peer-6:
 #    build: ../kv-store

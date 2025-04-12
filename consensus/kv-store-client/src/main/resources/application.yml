@@ -7,10 +7,10 @@ servers:
       address: kv-peer-2:8082
     - id: 3
       address: kv-peer-3:8083
-#    - id: 4
-#      address: kv-peer-4:8084
-#    - id: 5
-#      address: kv-peer-5:8085
+    # - id: 4
+    #   address: kv-peer-4:8084
+    # - id: 5
+    #   address: kv-peer-5:8085
 #    - id: 6
 #      address: kv-peer-6:8086
 #    - id: 7

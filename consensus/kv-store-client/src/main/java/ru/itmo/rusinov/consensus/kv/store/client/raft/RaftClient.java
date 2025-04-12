@@ -26,7 +26,7 @@ public class RaftClient {
     @SneakyThrows
     private byte[] sendRaftMessage(Raft.RaftServerRequest raftServerRequest) {
 
-        for (var retry = 0; retry < replicaIds.size(); retry ++) {
+        for (var retry = 0; retry < Integer.MAX_VALUE; retry ++) {
             var leader = currentLeader.get();
 
             try {

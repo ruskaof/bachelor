@@ -15,7 +15,7 @@ services:
     networks:
       - backend
     environment:
-      - K6_WEB_DASHBOARD_EXPORT=/results/0406-6ops-5m-paxos-3r-25ms_delay-1m_crash.html
+      - K6_WEB_DASHBOARD_EXPORT=/results/0412-6ops-10m-raft-3r-25ms_delay-exp_1.html
       - K6_WEB_DASHBOARD=true
       - BASE_URL=http://client:8080
 networks:

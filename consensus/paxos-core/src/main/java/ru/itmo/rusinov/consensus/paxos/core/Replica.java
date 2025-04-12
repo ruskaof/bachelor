@@ -1,6 +1,5 @@
 package ru.itmo.rusinov.consensus.paxos.core;
 
-import ch.qos.logback.core.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import paxos.Paxos;
 import paxos.Paxos.Command;
@@ -12,7 +11,7 @@ import java.util.*;
 @Slf4j
 public class Replica {
 
-    private static final long WINDOW = 5;
+    private static final long WINDOW = 10;
     private final DurableStateStore durableStateStore;
 
     private long slotIn = 1;
