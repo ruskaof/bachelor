@@ -38,11 +38,9 @@ message RequestVoteRPCResult {
 }
 
 message HeartBeat {
-
 }
 
 message ElectionTimeoutElapsed {
-
 }
 
 message ClientRequest {
