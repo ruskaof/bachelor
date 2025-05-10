@@ -61,10 +61,10 @@ public class Replica {
                 return;
             }
         }
-        var result = this.stateMachine.applyCommand(cmd);
+        var result = this.stateMachine.applyCommand(cmd.toByteArray());
         if (sendResponse) {
             log.info("Sending response for {}", cmd.getRequestId());
-            this.environment.sendResponse(UUID.fromString(cmd.getRequestId()), result.toByteArray());
+            this.environment.sendResponse(UUID.fromString(cmd.getRequestId()), result);
         }
         this.slotOut++;
 

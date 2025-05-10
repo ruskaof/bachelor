@@ -28,8 +28,9 @@ public class KvStorePaxosStateMachine implements StateMachine {
 
     @SneakyThrows
     @Override
-    public CommandResult applyCommand(Paxos.Command command) {
-        var protoCommand = Message.KvStoreProtoMessage.parseFrom(command.getContent());
+    public byte[] applyCommand(byte[] command) {
+        var parsedCommand = Paxos.Command.parseFrom(command);
+        var protoCommand = Message.KvStoreProtoMessage.parseFrom(parsedCommand.getContent());
 
         switch (protoCommand.getMessageCase()) {
             case GET -> {
@@ -42,18 +43,18 @@ public class KvStorePaxosStateMachine implements StateMachine {
         return null;
     }
 
-    private CommandResult handleSet(Message.SetMessage set) {
+    private byte[] handleSet(Message.SetMessage set) {
         database.put(set.getKey().toByteArray(), set.getValue().toByteArray());
-        return CommandResult.getDefaultInstance();
+        return CommandResult.getDefaultInstance().toByteArray();
     }
 
-    private CommandResult handleGet(Message.GetMessage get) {
+    private byte[] handleGet(Message.GetMessage get) {
         var bytes = database.get(get.getKey().toByteArray());
         var builder = CommandResult.newBuilder();
         if (Objects.nonNull(bytes)) {
             builder.setContent(ByteString.copyFrom(bytes));
         }
 
-        return builder.build();
+        return builder.build().toByteArray();
     }
 }
