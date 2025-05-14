@@ -24,6 +24,7 @@ public class TimeoutTimer {
     }
 
     public boolean isTimeout() {
-        return Objects.nonNull(nextTimeout) && nextTimeout.isBefore(Instant.now());
+        var currentTimeout = nextTimeout;
+        return Objects.nonNull(currentTimeout) && currentTimeout.isBefore(Instant.now());
     }
 }
